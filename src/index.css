@@ -1,0 +1,33 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Custom colors */
+    --bg-primary: 27 27 27;    /* #1B1B1B */
+    --text-primary: 164 164 164;  /* #A4A4A4 */
+    --icon-primary: 120 120 120;  /* #787878 */
+    --overlay: 255 255 255;    /* white with opacity */
+  }
+
+  html {
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  body {
+    @apply bg-bg-primary text-text-primary;
+  }
+}
+
+@layer utilities {
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+}
