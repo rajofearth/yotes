@@ -26,10 +26,9 @@ const TagFilters = () => {
     const [activeTag, setActiveTag] = useState('all');
     const [selectedTags, setSelectedTags] = useState(['all']);
 
-    // Show first 5 tags in pills (including All)
-    const visibleTags = SAMPLE_TAGS.slice(0, 5);
-    // Remaining tags for dropdown
-    const dropdownTags = SAMPLE_TAGS.slice(5);
+    // Show fewer tags on mobile
+    const visibleTags = SAMPLE_TAGS.slice(0, 3);
+    const dropdownTags = SAMPLE_TAGS.slice(3);
 
     const handleTagClick = (tagId) => {
         setActiveTag(tagId);
@@ -50,21 +49,14 @@ const TagFilters = () => {
     };
 
     return (
-        <div className="flex items-center justify-between h-12 -mt-2 mb-6">
+        <div className="flex items-center justify-between">
             {/* Tag Pills */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto scrollbar-hide">
                 {visibleTags.map((tag) => (
                     <Button
                         key={tag.id}
                         variant="ghost"
-                        onClick={() => handleTagClick(tag.id)}
-                        className={cn(
-                            "h-7 rounded-full px-3 text-xs font-medium transition-colors",
-                            tag.color,
-                            activeTag === tag.id 
-                                ? "bg-opacity-100 ring-1 ring-inset ring-overlay/20" 
-                                : "opacity-60 hover:opacity-100"
-                        )}
+                        className={`h-7 rounded-full px-2.5 sm:px-3 text-xs font-medium whitespace-nowrap hover:bg-overlay/10 ${tag.color}`}
                     >
                         {tag.name}
                     </Button>
@@ -77,10 +69,7 @@ const TagFilters = () => {
                     <Button 
                         variant="ghost" 
                         size="icon"
-                        className={cn(
-                            "h-7 w-7 rounded-full bg-overlay/5 hover:bg-overlay/10",
-                            selectedTags.length > 1 && "ring-1 ring-overlay/20"
-                        )}
+                        className="h-7 w-7 rounded-full bg-overlay/5 hover:bg-overlay/10 ml-1.5 flex-shrink-0"
                     >
                         <Filter className="h-4 w-4" />
                         <span className="sr-only">Filter tags</span>
@@ -88,7 +77,7 @@ const TagFilters = () => {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent 
                     align="end"
-                    className="w-56 bg-bg-primary border border-overlay/10 shadow-lg"
+                    className="w-[280px] sm:w-56 bg-bg-primary border border-overlay/10 shadow-lg"
                 >
                     <div className="px-2 py-1.5 text-xs font-medium text-text-primary/50">
                         Filter by tags

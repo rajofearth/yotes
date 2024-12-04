@@ -1,30 +1,63 @@
 import { Button } from '../ui/button';
 import { ChevronRight } from 'lucide-react';
 import { renderNoteCard } from './noteRender';
+import { useRef, useState } from 'react';
 
-const renderSection = (title, notes) => (
-    <section key={title} className="space-y-4">
-        <div className="flex justify-between items-center">
-            <h2 className="text-xl font-semibold tracking-tight">{title}</h2>
-            <Button 
-                variant="ghost" 
-                size="sm"
-                className="text-sm font-medium hover:bg-overlay/5"
-            >
-                See More <ChevronRight className="ml-1 h-4 w-4" />
-            </Button>
-        </div>
-        <div className="relative">
-            <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide snap-x snap-mandatory">
-                {notes?.slice(0, 4).map(note => (
-                    <div key={note.id} className="snap-start">
-                        {renderNoteCard(note)}
-                    </div>
-                ))}
+const renderSection = (title, notes) => {
+    const scrollContainerRef = useRef(null);
+    const [isScrolling, setIsScrolling] = useState(false);
+    const [startX, setStartX] = useState(0);
+    const [scrollLeft, setScrollLeft] = useState(0);
+
+    const handleMouseDown = (e) => {
+        setIsScrolling(true);
+        setStartX(e.pageX - scrollContainerRef.current.offsetLeft);
+        setScrollLeft(scrollContainerRef.current.scrollLeft);
+    };
+
+    const handleMouseMove = (e) => {
+        if (!isScrolling) return;
+        e.preventDefault();
+        const x = e.pageX - scrollContainerRef.current.offsetLeft;
+        const walk = (x - startX) * 2;
+        scrollContainerRef.current.scrollLeft = scrollLeft - walk;
+    };
+
+    const handleMouseUp = () => {
+        setIsScrolling(false);
+    };
+
+    return (
+        <section key={title} className="space-y-4">
+            <div className="flex justify-between items-center">
+                <h2 className="text-xl font-semibold tracking-tight">{title}</h2>
+                <Button 
+                    variant="ghost" 
+                    size="sm"
+                    className="text-sm font-medium hover:bg-overlay/5"
+                >
+                    See More <ChevronRight className="ml-1 h-4 w-4" />
+                </Button>
             </div>
-            <div className="absolute right-0 top-0 w-20 h-full bg-gradient-to-l from-bg-primary to-transparent pointer-events-none" />
-        </div>
-    </section>
-);
+            <div className="relative">
+                <div 
+                    ref={scrollContainerRef}
+                    className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide snap-x snap-mandatory cursor-grab active:cursor-grabbing"
+                    onMouseDown={handleMouseDown}
+                    onMouseMove={handleMouseMove}
+                    onMouseUp={handleMouseUp}
+                    onMouseLeave={handleMouseUp}
+                >
+                    {notes?.slice(0, 4).map(note => (
+                        <div key={note.id} className="snap-start">
+                            {renderNoteCard(note)}
+                        </div>
+                    ))}
+                </div>
+                <div className="absolute right-0 top-0 w-20 h-full bg-gradient-to-l from-bg-primary to-transparent pointer-events-none" />
+            </div>
+        </section>
+    );
+};
 
 export { renderSection };
