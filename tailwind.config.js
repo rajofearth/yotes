@@ -1,4 +1,6 @@
 /** @type {import('tailwindcss').Config} */
+import animate from "tailwindcss-animate"
+
 export default {
     darkMode: ["class"],
     content: [
@@ -6,17 +8,17 @@ export default {
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
   theme: {
-  	extend: {
-  		colors: {
-  			'bg-primary': 'rgb(var(--bg-primary) / <alpha-value>)',
-  			'text-primary': 'rgb(var(--text-primary) / <alpha-value>)',
-  			'icon-primary': 'rgb(var(--icon-primary) / <alpha-value>)',
-  			'overlay': 'rgb(var(--overlay) / <alpha-value>)',
+  		extend: {
+  			colors: {
+  				'bg-primary': 'rgb(var(--bg-primary) / <alpha-value>)',
+  				'text-primary': 'rgb(var(--text-primary) / <alpha-value>)',
+  				'icon-primary': 'rgb(var(--icon-primary) / <alpha-value>)',
+  				'overlay': 'rgb(var(--overlay) / <alpha-value>)',
+  			},
+  			fontFamily: {
+  				mono: ['JetBrains Mono', 'monospace'],
+  			},
   		},
-  		fontFamily: {
-  			mono: ['JetBrains Mono', 'monospace'],
-  		},
-  	},
   },
-  plugins: [await import("tailwindcss-animate")],
+  plugins: [animate],
 }
