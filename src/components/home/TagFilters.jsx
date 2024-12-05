@@ -11,24 +11,16 @@ import { Filter } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from "../../lib/utils";
 
-// Sample tags data with colors
-const SAMPLE_TAGS = [
-    { id: 'all', name: 'All', color: 'bg-overlay/20 text-text-primary' },
-    { id: 1, name: 'Work', color: 'bg-blue-500/20 text-blue-500' },
-    { id: 2, name: 'Personal', color: 'bg-purple-500/20 text-purple-500' },
-    { id: 3, name: 'Ideas', color: 'bg-green-500/20 text-green-500' },
-    { id: 4, name: 'Tasks', color: 'bg-yellow-500/20 text-yellow-500' },
-    { id: 5, name: 'Learning', color: 'bg-pink-500/20 text-pink-500' },
-    { id: 6, name: 'Projects', color: 'bg-orange-500/20 text-orange-500' },
-];
-
-const TagFilters = () => {
+const TagFilters = ({ tags }) => {
     const [activeTag, setActiveTag] = useState('all');
     const [selectedTags, setSelectedTags] = useState(['all']);
 
     // Show fewer tags on mobile
-    const visibleTags = SAMPLE_TAGS.slice(0, 3);
-    const dropdownTags = SAMPLE_TAGS.slice(3);
+    const visibleTags = [
+        { id: 'all', name: 'All', color: 'bg-overlay/20 text-text-primary' },
+        ...tags.slice(0, 2)
+    ];
+    const dropdownTags = tags.slice(2);
 
     const handleTagClick = (tagId) => {
         setActiveTag(tagId);
@@ -91,7 +83,7 @@ const TagFilters = () => {
                         <div className="w-2 h-2 rounded-full bg-overlay/20" />
                         All
                     </DropdownMenuCheckboxItem>
-                    {SAMPLE_TAGS.slice(1).map((tag) => (
+                    {tags.slice(1).map((tag) => (
                         <DropdownMenuCheckboxItem
                             key={tag.id}
                             checked={selectedTags.includes(tag.id)}

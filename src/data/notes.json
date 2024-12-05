@@ -1,0 +1,25 @@
+{
+    "notes": [
+        {
+            "id": 1,
+            "title": "Weekly Team Meeting Notes - Project Roadmap Discussion",
+            "description": "Discussed Q4 project timeline, feature prioritization, and resource allocation. Key points: mobile app launch in November, API refactoring due by December, new team members onboarding next week.",
+            "date": "2024-03-14T10:00:00.000Z",
+            "tagIds": [1, 3]
+        },
+        {
+            "id": 2,
+            "title": "Design System Updates",
+            "description": "Updated color palette, typography scale, and component library. Added new interactive states and improved accessibility across all components.",
+            "date": "2024-03-14T11:30:00.000Z",
+            "tagIds": [1, 4]
+        },
+        {
+            "id": 3,
+            "title": "Implement User Authentication",
+            "description": "Integrate OAuth with Google and Facebook. Ensure secure password storage and implement password reset functionality.",
+            "date": "2024-12-05T09:00:00.000Z",
+            "tagIds": [2, 6]
+        }
+    ]
+} 

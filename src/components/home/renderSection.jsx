@@ -3,7 +3,8 @@ import { ChevronRight } from 'lucide-react';
 import { renderNoteCard } from './noteRender';
 import { useRef, useState } from 'react';
 
-const renderSection = (title, notes) => {
+// Create a proper React component
+const NotesSection = ({ title, notes, sectionKey }) => {
     const scrollContainerRef = useRef(null);
     const [isScrolling, setIsScrolling] = useState(false);
     const [startX, setStartX] = useState(0);
@@ -28,7 +29,7 @@ const renderSection = (title, notes) => {
     };
 
     return (
-        <section key={title} className="space-y-4">
+        <section className="space-y-4">
             <div className="flex justify-between items-center">
                 <h2 className="text-xl font-semibold tracking-tight">{title}</h2>
                 <Button 
@@ -60,4 +61,8 @@ const renderSection = (title, notes) => {
     );
 };
 
-export { renderSection };
+// Export both the component and the render function
+export { NotesSection };
+export const renderSection = (title, notes, key) => {
+    return <NotesSection key={key} sectionKey={key} title={title} notes={notes} />;
+};
