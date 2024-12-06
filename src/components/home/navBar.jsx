@@ -18,7 +18,7 @@ export default function NavBar() {
                         <div className="flex h-16 items-center justify-between gap-4">
                             {/* Logo/Title */}
                             <h1 className="text-xl sm:text-2xl font-semibold tracking-tight truncate">
-                                Your Notes
+                                Yotes
                             </h1>
     
                             {/* Search - Mobile */}

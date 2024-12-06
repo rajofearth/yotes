@@ -38,7 +38,7 @@ export default function Login({ showToast }) {
             <div className="w-full max-w-sm space-y-8">
                 {/* Header */}
                 <div className="space-y-2">
-                    <h1 className="text-2xl font-semibold tracking-tight">Your Notes</h1>
+                    <h1 className="text-2xl font-semibold tracking-tight">Yotes</h1>
                     <p className="text-sm text-text-primary/60">
                         Welcome back! Please sign in to continue.
                     </p>
