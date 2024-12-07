@@ -4,12 +4,16 @@ import { supabase } from '../utils/supabaseClient';
 import { Input } from '../components/ui/input';
 import { Button } from '../components/ui/button';
 import { Eye, EyeOff, ArrowRight, Loader2 } from 'lucide-react';
+import GoogleButton from '../components/ui/google-button'
+
+const GOOGLE_DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
 
 export default function Login({ showToast }) {
     const [showPassword, setShowPassword] = useState(false);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [isGoogleLoading, setIsGoogleLoading] = useState(false);
     const navigate = useNavigate();
 
     const handleLogin = async (e) => {
@@ -30,6 +34,28 @@ export default function Login({ showToast }) {
             showToast(error.message, 'error');
         } finally {
             setIsLoading(false);
+        }
+    };
+
+    const handleGoogleLogin = async () => {
+        setIsGoogleLoading(true);
+        try {
+            const { error } = await supabase.auth.signInWithOAuth({
+                provider: 'google',
+                options: {
+                    redirectTo: `${window.location.origin}/auth/callback`,
+                    scopes: GOOGLE_DRIVE_SCOPE,
+                    queryParams: {
+                        access_type: 'offline',
+                        prompt: 'select_account',
+                    }
+                }
+            });
+
+            if (error) throw error;
+        } catch (error) {
+            showToast(error.message, 'error');
+            setIsGoogleLoading(false);
         }
     };
 
@@ -89,23 +115,41 @@ export default function Login({ showToast }) {
                         </div>
                     </div>
 
-                    <Button
-                        type="submit"
-                        className="w-full h-10 bg-overlay/5 hover:bg-overlay/10 text-text-primary border border-overlay/10 rounded-lg transition-colors group"
-                        disabled={isLoading}
-                    >
-                        {isLoading ? (
-                            <div className="flex items-center justify-center gap-2">
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                                <span>Signing in...</span>
+                    <div className="space-y-4">
+                        <Button
+                            type="submit"
+                            className="w-full h-10 bg-overlay/5 hover:bg-overlay/10 text-text-primary border border-overlay/10 rounded-lg transition-colors group"
+                            disabled={isLoading}
+                        >
+                            {isLoading ? (
+                                <div className="flex items-center justify-center gap-2">
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                    <span>Signing in...</span>
+                                </div>
+                            ) : (
+                                <div className="flex items-center justify-center gap-2">
+                                    <span>Sign in</span>
+                                    <ArrowRight className="h-4 w-4 group-hover:translate-x-0.5 transition-transform" />
+                                </div>
+                            )}
+                        </Button>
+
+                        <div className="relative">
+                            <div className="absolute inset-0 flex items-center">
+                                <span className="w-full border-t border-overlay/10" />
                             </div>
-                        ) : (
-                            <div className="flex items-center justify-center gap-2">
-                                <span>Sign in</span>
-                                <ArrowRight className="h-4 w-4 group-hover:translate-x-0.5 transition-transform" />
+                            <div className="relative flex justify-center text-xs uppercase">
+                                <span className="bg-bg-primary px-2 text-text-primary/60">
+                                    Or continue with
+                                </span>
                             </div>
-                        )}
-                    </Button>
+                        </div>
+
+                        <GoogleButton 
+                            onClick={handleGoogleLogin}
+                            isLoading={isGoogleLoading}
+                        />
+                    </div>
                 </form>
 
                 {/* Footer */}

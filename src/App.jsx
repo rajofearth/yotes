@@ -6,6 +6,11 @@ import Home from "./pages/home"
 import Login from "./pages/login"
 import Signup from "./pages/signup"
 import { Toast } from "./components/ui/toast"
+import AuthCallback from './pages/auth/callback'
+import { GoogleDriveProvider } from './contexts/GoogleDriveContext';
+import NoteDetail from './pages/note/[id]';
+import { ToastProvider } from './contexts/ToastContext';
+import CreateNote from './pages/create';
 
 function App() {
   const [session, setSession] = useState(null)
@@ -39,47 +44,69 @@ function App() {
 
   return (
     <Router>
-      <Routes>
-        <Route
-          path="/"
-          element={
-            session ? (
-              <Home />
-            ) : (
-              <Navigate to="/login" replace />
-            )
-          }
-        />
-        <Route
-          path="/login"
-          element={
-            !session ? (
-              <Login showToast={showToast} />
-            ) : (
-              <Navigate to="/" replace />
-            )
-          }
-        />
-        <Route
-          path="/signup"
-          element={
-            !session ? (
-              <Signup showToast={showToast} />
-            ) : (
-              <Navigate to="/" replace />
-            )
-          }
-        />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+      <ToastProvider>
+        <Routes>
+          <Route
+            path="/"
+            element={
+              session ? (
+                <GoogleDriveProvider>
+                  <Home />
+                </GoogleDriveProvider>
+              ) : (
+                <Navigate to="/login" replace />
+              )
+            }
+          />
+          <Route
+            path="/note/:id"
+            element={
+              session ? (
+                <GoogleDriveProvider>
+                  <NoteDetail />
+                </GoogleDriveProvider>
+              ) : (
+                <Navigate to="/login" replace />
+              )
+            }
+          />
+          <Route
+            path="/login"
+            element={
+              !session ? (
+                <Login showToast={showToast} />
+              ) : (
+                <Navigate to="/" replace />
+              )
+            }
+          />
+          <Route
+            path="/signup"
+            element={
+              !session ? (
+                <Signup showToast={showToast} />
+              ) : (
+                <Navigate to="/" replace />
+              )
+            }
+          />
+          <Route path="/auth/callback" element={<AuthCallback />} />
+          <Route
+            path="/create"
+            element={
+              session ? (
+                <GoogleDriveProvider>
+                  <CreateNote />
+                </GoogleDriveProvider>
+              ) : (
+                <Navigate to="/login" replace />
+              )
+            }
+          />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </ToastProvider>
 
-      {toast && (
-        <Toast
-          message={toast.message}
-          type={toast.type}
-          onClose={() => setToast(null)}
-        />
-      )}
       <Analytics />
     </Router>
   )

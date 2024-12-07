@@ -8,8 +8,11 @@ import {
     DropdownMenuTrigger,
     DropdownMenuSeparator
 } from "../ui/dropdown-menu"
+import { useNavigate } from 'react-router-dom';
 
 export default function NavBar() {
+    const navigate = useNavigate();
+
     return (
         <>
         {/* Navbar */}
@@ -52,6 +55,7 @@ export default function NavBar() {
                                             variant="ghost" 
                                             size="icon"
                                             className="h-10 w-10 rounded-full bg-overlay/5 hover:bg-overlay/10 transition-colors group"
+                                            onClick={() => navigate('/create')}
                                         >
                                             <Plus className="h-5 w-5 text-icon-primary group-hover:text-white transition-colors" />
                                             <span className="sr-only">Create new</span>
@@ -61,7 +65,7 @@ export default function NavBar() {
                                         align="end"
                                         className="w-[280px] sm:w-48 bg-bg-primary border border-overlay/10 shadow-lg"
                                     >
-                                        <DropdownMenuItem className="flex items-center gap-2 text-text-primary hover:bg-overlay/10 cursor-pointer">
+                                        <DropdownMenuItem className="flex items-center gap-2 text-text-primary hover:bg-overlay/10 cursor-pointer" onClick={() => navigate('/create')}>
                                             <FileText className="h-4 w-4" />
                                             <div className="flex flex-col">
                                                 <span className="text-sm">Note</span>
@@ -93,11 +97,7 @@ export default function NavBar() {
                                     </DropdownMenuContent>
                                 </DropdownMenu>
     
-                                <Button 
-                                    variant="ghost" 
-                                    size="icon"
-                                    className="h-10 w-10 rounded-full bg-overlay/5 hover:bg-overlay/10 transition-colors group"
-                                >
+                                <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full bg-overlay/5 hover:bg-overlay/10 transition-colors group" >
                                     <Settings className="h-5 w-5 text-icon-primary group-hover:text-white transition-colors" />
                                     <span className="sr-only">Settings</span>
                                 </Button>

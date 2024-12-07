@@ -1,14 +1,17 @@
+import { useRef, useState } from 'react';
+import { NoteCard } from './noteRender';
 import { Button } from '../ui/button';
 import { ChevronRight } from 'lucide-react';
-import { renderNoteCard } from './noteRender';
-import { useRef, useState } from 'react';
 
-// Create a proper React component
-const NotesSection = ({ title, notes, sectionKey }) => {
+export const NotesSection = ({ title, notes = [], sectionKey }) => {
     const scrollContainerRef = useRef(null);
     const [isScrolling, setIsScrolling] = useState(false);
     const [startX, setStartX] = useState(0);
     const [scrollLeft, setScrollLeft] = useState(0);
+
+    if (!notes || notes.length === 0) {
+        return null;
+    }
 
     const handleMouseDown = (e) => {
         setIsScrolling(true);
@@ -31,7 +34,12 @@ const NotesSection = ({ title, notes, sectionKey }) => {
     return (
         <section className="space-y-4">
             <div className="flex justify-between items-center">
-                <h2 className="text-xl font-semibold tracking-tight">{title}</h2>
+                <div className="flex items-baseline gap-2">
+                    <h2 className="text-xl font-semibold tracking-tight">{title}</h2>
+                    <span className="text-sm text-text-primary/60">
+                        {notes.length} notes
+                    </span>
+                </div>
                 <Button 
                     variant="ghost" 
                     size="sm"
@@ -49,9 +57,12 @@ const NotesSection = ({ title, notes, sectionKey }) => {
                     onMouseUp={handleMouseUp}
                     onMouseLeave={handleMouseUp}
                 >
-                    {notes?.slice(0, 4).map(note => (
-                        <div key={note.id} className="snap-start">
-                            {renderNoteCard(note)}
+                    {notes.map(note => (
+                        <div 
+                            key={note.id} 
+                            className="snap-start min-w-[300px] max-w-[300px]"
+                        >
+                            <NoteCard note={note} />
                         </div>
                     ))}
                 </div>
@@ -61,8 +72,6 @@ const NotesSection = ({ title, notes, sectionKey }) => {
     );
 };
 
-// Export both the component and the render function
-export { NotesSection };
 export const renderSection = (title, notes, key) => {
     return <NotesSection key={key} sectionKey={key} title={title} notes={notes} />;
 };
