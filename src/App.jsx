@@ -11,36 +11,66 @@ import { GoogleDriveProvider } from './contexts/GoogleDriveContext';
 import NoteDetail from './pages/note/[id]';
 import { ToastProvider } from './contexts/ToastContext';
 import CreateNote from './pages/create';
+import ErrorBoundary from './components/ErrorBoundary';
 
-function App() {
-  const [session, setSession] = useState(null)
-  const [toast, setToast] = useState(null)
+// Protected route component that includes necessary providers
+function ProtectedRoute({ children }) {
+  const [session, setSession] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check active sessions and set up auth listener
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session)
-    })
+      setSession(session);
+      setLoading(false);
+    });
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session)
-    })
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
 
-    return () => subscription.unsubscribe()
-  }, [])
+    return () => subscription.unsubscribe();
+  }, []);
+
+  if (loading) {
+    return <div className="min-h-screen bg-bg-primary flex items-center justify-center">
+      <div className="text-text-primary">Loading...</div>
+    </div>;
+  }
+
+  if (!session) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return (
+    <GoogleDriveProvider>
+      <ErrorBoundary fallback={<div>Something went wrong with Google Drive integration</div>}>
+        {children}
+      </ErrorBoundary>
+    </GoogleDriveProvider>
+  );
+}
+
+function App() {
+  const [session, setSession] = useState(null);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   // Check system preference and set dark mode
   useEffect(() => {
     if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-      document.documentElement.classList.add('dark')
+      document.documentElement.classList.add('dark');
     }
-  }, [])
-
-  const showToast = (message, type = 'success') => {
-    setToast({ message, type })
-  }
+  }, []);
 
   return (
     <Router>
@@ -49,32 +79,24 @@ function App() {
           <Route
             path="/"
             element={
-              session ? (
-                <GoogleDriveProvider>
-                  <Home />
-                </GoogleDriveProvider>
-              ) : (
-                <Navigate to="/login" replace />
-              )
+              <ProtectedRoute>
+                <Home />
+              </ProtectedRoute>
             }
           />
           <Route
             path="/note/:id"
             element={
-              session ? (
-                <GoogleDriveProvider>
-                  <NoteDetail />
-                </GoogleDriveProvider>
-              ) : (
-                <Navigate to="/login" replace />
-              )
+              <ProtectedRoute>
+                <NoteDetail />
+              </ProtectedRoute>
             }
           />
           <Route
             path="/login"
             element={
               !session ? (
-                <Login showToast={showToast} />
+                <Login />
               ) : (
                 <Navigate to="/" replace />
               )
@@ -84,7 +106,7 @@ function App() {
             path="/signup"
             element={
               !session ? (
-                <Signup showToast={showToast} />
+                <Signup />
               ) : (
                 <Navigate to="/" replace />
               )
@@ -94,22 +116,17 @@ function App() {
           <Route
             path="/create"
             element={
-              session ? (
-                <GoogleDriveProvider>
-                  <CreateNote />
-                </GoogleDriveProvider>
-              ) : (
-                <Navigate to="/login" replace />
-              )
+              <ProtectedRoute>
+                <CreateNote />
+              </ProtectedRoute>
             }
           />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </ToastProvider>
-
       <Analytics />
     </Router>
-  )
+  );
 }
 
 export default App

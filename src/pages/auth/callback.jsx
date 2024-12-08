@@ -7,15 +7,27 @@ export default function AuthCallback() {
 
   useEffect(() => {
     const handleAuthCallback = async () => {
-      const { error } = await supabase.auth.exchangeCodeForSession(window.location.search)
-      if (!error) {
-        navigate('/')
-      } else {
-        navigate('/login')
-      }
-    }
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) throw error;
+        
+        if (!session?.provider_token) {
+          throw new Error('No access token received from Google');
+        }
 
-    handleAuthCallback()
+        // Successfully authenticated
+        navigate('/', { replace: true });
+      } catch (error) {
+        console.error('Auth callback error:', error);
+        navigate('/login', { 
+          replace: true,
+          state: { error: 'Authentication failed. Please try again.' }
+        });
+      }
+    };
+
+    handleAuthCallback();
   }, [navigate])
 
   return (

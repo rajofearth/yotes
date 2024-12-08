@@ -17,6 +17,9 @@ export default function Home() {
         deleteNote 
     } = useNotes();
 
+    // Group notes only after they're loaded
+    const groupedNotes = groupNotesByDate(notes || []);
+    
     // Show loading state
     if (isDriveLoading || isNotesLoading) {
         return (
@@ -35,8 +38,7 @@ export default function Home() {
         );
     }
 
-    // Group notes only after they're loaded
-    const groupedNotes = groupNotesByDate(notes || []);
+
 
     // Initial tags state - you might want to load this from Google Drive later
     const initialTags = [

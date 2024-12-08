@@ -1,42 +1,137 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useGoogleDrive } from '../contexts/GoogleDriveContext';
 import { useToast } from '../contexts/ToastContext';
 
+const CACHE_KEY = 'notes_cache';
+const CACHE_TIMESTAMP_KEY = 'notes_cache_timestamp';
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
 export function useNotes() {
-    const { driveApi, folderIds } = useGoogleDrive();
-    const [notes, setNotes] = useState([]);
-    const [tags, setTags] = useState([]);
+    const { driveApi, folderIds, isLoading: isDriveLoading } = useGoogleDrive();
+    const [notes, setNotes] = useState(() => {
+        const cached = localStorage.getItem(CACHE_KEY);
+        return cached ? JSON.parse(cached) : [];
+    });
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(null);
     const showToast = useToast();
 
-    useEffect(() => {
-        loadNotes();
-    }, [driveApi, folderIds]);
+    const shouldRefreshCache = useCallback(() => {
+        const timestamp = localStorage.getItem(CACHE_TIMESTAMP_KEY);
+        if (!timestamp) return true;
+        return Date.now() - parseInt(timestamp) > CACHE_DURATION;
+    }, []);
 
-    const loadNotes = async () => {
-        if (!driveApi || !folderIds) return;
+    const loadNotes = useCallback(async (force = false) => {
+        if (!driveApi || !folderIds?.notes) {
+            setIsLoading(false);
+            return;
+        }
+
+        // Use cache if available and not forced refresh
+        if (!force && !shouldRefreshCache()) {
+            setIsLoading(false);
+            return;
+        }
 
         setIsLoading(true);
+        setError(null);
+
         try {
+            console.log('Fetching notes from folder:', folderIds.notes);
+            // Get list of files with minimal fields
             const response = await driveApi.listFiles(folderIds.notes);
+            
+            if (!response.files?.length) {
+                setNotes([]);
+                localStorage.setItem(CACHE_KEY, JSON.stringify([]));
+                localStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString());
+                setIsLoading(false);
+                return;
+            }
+
+            // Download all files in a single batch request
+            const blobs = await driveApi.downloadFiles(response.files.map(f => f.id));
+            
+            // Process all notes in parallel
             const notesData = await Promise.all(
-                response.files.map(async (file) => {
-                    const blob = await driveApi.downloadFile(file.id);
-                    const text = await blob.text();
-                    return JSON.parse(text);
+                blobs.map(async (blob, index) => {
+                    try {
+                        const text = await blob.text();
+                        // Remove any BOM or invalid characters at the start
+                        const cleanText = text.replace(/^\uFEFF/, '').trim();
+
+                        if (!cleanText) {
+                            return null;
+                        }
+
+                        try {
+                            const parsed = JSON.parse(cleanText);
+                            
+                            // Validate note structure
+                            if (!parsed.id || !parsed.title || !parsed.createdAt || !parsed.updatedAt) {
+                                return null;
+                            }
+
+                            return parsed;
+                        } catch (parseErr) {
+                            return null;
+                        }
+                    } catch (err) {
+                        return null;
+                    }
                 })
             );
-            setNotes(notesData);
+            
+            // Filter out any failed notes and sort by modified time
+            const validNotes = notesData
+                .filter(note => {
+                    if (!note) return false;
+                    if (!note.id || !note.createdAt || !note.updatedAt) {
+                        return false;
+                    }
+                    return true;
+                })
+                .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+            
+            // Update cache
+            localStorage.setItem(CACHE_KEY, JSON.stringify(validNotes));
+            localStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString());
+            
+            setNotes(validNotes);
         } catch (err) {
             setError(err);
-            console.error('Failed to load notes:', err);
+            
+            // Try to use cached data as fallback
+            const cached = localStorage.getItem(CACHE_KEY);
+            if (cached) {
+                try {
+                    const cachedNotes = JSON.parse(cached);
+                    setNotes(cachedNotes);
+                    showToast('Using cached notes due to loading error', 'warning');
+                } catch (cacheErr) {
+                    localStorage.removeItem(CACHE_KEY);
+                    localStorage.removeItem(CACHE_TIMESTAMP_KEY);
+                    setNotes([]);
+                }
+            }
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [driveApi, folderIds?.notes, shouldRefreshCache, showToast]);
 
-    const createNote = async (noteData) => {
+    // Load notes when dependencies change
+    useEffect(() => {
+        if (!isDriveLoading) {
+            loadNotes();
+        }
+    }, [loadNotes, isDriveLoading]);
+
+    const createNote = useCallback(async (noteData) => {
+        if (!driveApi || !folderIds?.notes) {
+            throw new Error('Drive API not initialized');
+        }
+
         const note = {
             id: `note-${Date.now()}`,
             ...noteData,
@@ -44,111 +139,76 @@ export function useNotes() {
             updatedAt: new Date().toISOString()
         };
 
-        const noteContent = JSON.stringify(note, null, 2);
-        const blob = new Blob([noteContent], { type: 'application/json' });
-        const file = new File([blob], `${note.id}.json`, { type: 'application/json' });
-
-        await driveApi.uploadFile(file, folderIds.notes);
-        await loadNotes(); // Reload notes
-        return note;
-    };
-
-    const updateNote = async (noteId, updates) => {
-        const noteToUpdate = notes.find(n => n.id === noteId);
-        if (!noteToUpdate) throw new Error('Note not found');
-
-        const updatedNote = {
-            ...noteToUpdate,
-            ...updates,
-            updatedAt: new Date().toISOString()
-        };
-
-        const noteContent = JSON.stringify(updatedNote, null, 2);
-        const blob = new Blob([noteContent], { type: 'application/json' });
-        const file = new File([blob], `${noteId}.json`, { type: 'application/json' });
-
-        // Find and delete the old file
-        const response = await driveApi.listFiles(folderIds.notes);
-        const oldFile = response.files.find(f => f.name === `${noteId}.json`);
-        if (oldFile) {
-            await driveApi.deleteFile(oldFile.id);
-        }
-
-        await driveApi.uploadFile(file, folderIds.notes);
-        await loadNotes(); // Reload notes
-        return updatedNote;
-    };
-
-    const deleteNote = async (noteId) => {
         try {
-            const response = await driveApi.listFiles(folderIds.notes);
-            const file = response.files.find(f => f.name === `${noteId}.json`);
-            if (file) {
-                await driveApi.deleteFile(file.id);
-                
-                // Update local state
-                const deletedNote = notes.find(n => n.id === noteId);
-                const updatedNotes = notes.filter(n => n.id !== noteId);
-                setNotes(updatedNotes);
-
-                // Check if we need to remove any tags
-                if (deletedNote?.tags) {
-                    const allRemainingTags = updatedNotes.flatMap(n => n.tags || []);
-                    const updatedTags = tags.filter(tag => 
-                        allRemainingTags.includes(tag.id) || tag.id === 'getting-started'
-                    );
-
-                    if (updatedTags.length !== tags.length) {
-                        setTags(updatedTags);
-                        await updateTagsFile(updatedTags);
-                    }
-                }
-
-                showToast('Note deleted successfully', 'success');
-            }
-        } catch (error) {
-            console.error('Failed to delete note:', error);
-            showToast('Failed to delete note', 'error');
-        }
-    };
-
-    // Load tags
-    const loadTags = async () => {
-        try {
-            const response = await driveApi.listFiles(folderIds.tags);
-            const tagsFile = response.files.find(f => f.name === 'tags.json');
-            if (tagsFile) {
-                const blob = await driveApi.downloadFile(tagsFile.id);
-                const text = await blob.text();
-                setTags(JSON.parse(text));
-            }
+            const noteContent = JSON.stringify(note, null, 2);
+            
+            const blob = new Blob([noteContent], { type: 'application/json' });
+            const file = new File([blob], `${note.id}.json`, { type: 'application/json' });
+            const uploadResult = await driveApi.uploadFile(file, folderIds.notes);
+            
+            // Update local state and cache
+            const updatedNotes = [note, ...notes];
+            setNotes(updatedNotes);
+            localStorage.setItem(CACHE_KEY, JSON.stringify(updatedNotes));
+            localStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString());
+            
+            showToast('Note created successfully', 'success');
+            return note;
         } catch (err) {
-            console.error('Failed to load tags:', err);
+            showToast('Failed to create note. Please try again.', 'error');
+            throw err;
         }
-    };
+    }, [driveApi, folderIds?.notes, notes, showToast]);
 
-    // Update tags file
-    const updateTagsFile = async (newTags) => {
-        const tagsContent = JSON.stringify(newTags, null, 2);
-        const tagsBlob = new Blob([tagsContent], { type: 'application/json' });
-        const tagsFile = new File([tagsBlob], 'tags.json', { type: 'application/json' });
-
-        const response = await driveApi.listFiles(folderIds.tags);
-        const existingFile = response.files.find(f => f.name === 'tags.json');
-        if (existingFile) {
-            await driveApi.deleteFile(existingFile.id);
+    const updateNote = useCallback(async (noteId, updates) => {
+        if (!driveApi || !folderIds?.notes) {
+            throw new Error('Drive API not initialized');
         }
-        await driveApi.uploadFile(tagsFile, folderIds.tags);
-    };
+
+        try {
+            const noteToUpdate = notes.find(n => n.id === noteId);
+            if (!noteToUpdate) throw new Error('Note not found');
+
+            const updatedNote = {
+                ...noteToUpdate,
+                ...updates,
+                updatedAt: new Date().toISOString()
+            };
+
+            const noteContent = JSON.stringify(updatedNote, null, 2);
+            
+            const blob = new Blob([noteContent], { type: 'application/json' });
+            const file = new File([blob], `${noteId}.json`, { type: 'application/json' });
+
+            // Find and delete the old file
+            const response = await driveApi.listFiles(folderIds.notes);
+            const oldFile = response.files.find(f => f.name === `${noteId}.json`);
+            if (oldFile) {
+                await driveApi.deleteFile(oldFile.id);
+            }
+
+            const uploadResult = await driveApi.uploadFile(file, folderIds.notes);
+
+            // Update local state and cache
+            const updatedNotes = notes.map(n => n.id === noteId ? updatedNote : n);
+            setNotes(updatedNotes);
+            localStorage.setItem(CACHE_KEY, JSON.stringify(updatedNotes));
+            localStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString());
+
+            showToast('Note updated successfully', 'success');
+            return updatedNote;
+        } catch (err) {
+            showToast('Failed to update note. Please try again.', 'error');
+            throw err;
+        }
+    }, [driveApi, folderIds?.notes, notes, showToast]);
 
     return {
         notes,
-        tags,
-        isLoading,
+        isLoading: isLoading || isDriveLoading,
         error,
         createNote,
         updateNote,
-        deleteNote,
-        refreshNotes: loadNotes
+        refreshNotes: () => loadNotes(true)
     };
 } 

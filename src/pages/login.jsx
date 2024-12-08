@@ -47,7 +47,8 @@ export default function Login({ showToast }) {
                     scopes: GOOGLE_DRIVE_SCOPE,
                     queryParams: {
                         access_type: 'offline',
-                        prompt: 'select_account',
+                        prompt: 'consent',
+                        include_granted_scopes: 'true'
                     }
                 }
             });
