@@ -5,17 +5,26 @@ import { TagFilters } from '../components/home/TagFilters'
 import NavBar from '../components/home/navBar'
 import { useNotes } from '../hooks/useNotes';
 import { useGoogleDrive } from '../contexts/GoogleDriveContext';
+import { useLocation } from 'react-router-dom';
 
 export default function Home() {
     const { isLoading: isDriveLoading } = useGoogleDrive();
+    const location = useLocation();
     const { 
         notes, 
         isLoading: isNotesLoading, 
         error,
         createNote,
         updateNote,
-        deleteNote 
+        deleteNote,
+        refreshNotes
     } = useNotes();
+
+    useEffect(() => {
+        if (location.state?.refresh) {
+            refreshNotes();
+        }
+    }, [location]);
 
     // Group notes only after they're loaded
     const groupedNotes = groupNotesByDate(notes || []);
@@ -55,14 +64,14 @@ export default function Home() {
             <main className="max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 pb-8 space-y-6 sm:space-y-8">
                 <TagFilters tags={initialTags} />
                 {groupedNotes.Today?.length > 0 && (
-                    <NotesSection key="today" sectionKey="today" title="Today" notes={groupedNotes.Today} />
+                    <NotesSection key="today" sectionKey="today" title="Today" notes={groupedNotes.Today} refreshNotes={refreshNotes} />
                 )}
                 {groupedNotes.Yesterday?.length > 0 && (
-                    <NotesSection key="yesterday" sectionKey="yesterday" title="Yesterday" notes={groupedNotes.Yesterday} />
+                    <NotesSection key="yesterday" sectionKey="yesterday" title="Yesterday" notes={groupedNotes.Yesterday} refreshNotes={refreshNotes} />
                 )}
                 {Object.entries(groupedNotes.Earlier).map(([date, notes]) => 
                     notes.length > 0 && (
-                        <NotesSection key={date} sectionKey={date} title={date} notes={notes} />
+                        <NotesSection key={date} sectionKey={date} title={date} notes={notes} refreshNotes={refreshNotes} />
                     )
                 )}
             </main>

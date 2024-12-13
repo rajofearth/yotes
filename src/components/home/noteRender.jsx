@@ -12,8 +12,8 @@ import {
 import { useNotes } from '../../hooks/useNotes';
 import { useToast } from '../../contexts/ToastContext';
 
-export const NoteCard = ({ note }) => {
-    const [showFullContent, setShowFullContent] = useState(false);
+export const NoteCard = ({ note, refreshNotes }) => {
+    const [showFulldescription, setShowFulldescription] = useState(false);
     const navigate = useNavigate();
     const { deleteNote } = useNotes();
     const showToast = useToast();
@@ -21,30 +21,33 @@ export const NoteCard = ({ note }) => {
     if (!note) return null;
 
     const title = note.title || 'Untitled Note';
-    const content = note.content || '';
+    const description = note.description || '';
 
-    const contentLines = content.split('\n').filter(line => line.trim());
-    const firstLine = contentLines[0] || '';
-    const hasMoreContent = contentLines.length > 1;
+    const MAX_DESCRIPTION_LENGTH = 100; // Set the maximum length for the truncated description
+
+    const truncatedDescription = description.length > MAX_DESCRIPTION_LENGTH
+        ? description.substring(0, MAX_DESCRIPTION_LENGTH) + '...'
+        : description;
 
     const handleMoreClick = (e) => {
         e.stopPropagation(); // Prevent card click when clicking menu
-        setShowFullContent(true);
+        setShowFulldescription(true);
     };
 
     const handleDelete = async (e) => {
         e.stopPropagation();
         try {
             await deleteNote(note.id);
+            refreshNotes();
         } catch (error) {
             showToast('Failed to delete note', 'error');
         }
     };
 
     return (
-        <Card 
+        <Card
             className="p-4 bg-overlay/5 border-overlay/10 hover:bg-overlay/10 transition-colors group cursor-pointer"
-            onClick={() => navigate(`/note/${note.id}`)}
+            onClick={() => navigate(`/note/view/${note.id}`)}
         >
             <div className="space-y-2">
                 <div className="flex items-start justify-between gap-2">
@@ -54,26 +57,25 @@ export const NoteCard = ({ note }) => {
                             <Button
                                 variant="ghost"
                                 className="h-8 w-8 p-0 text-text-primary/60 hover:text-text-primary"
-                                onClick={(e) => e.stopPropagation()}
+                                onClick={(e) => {
+                                    e.stopPropagation(); // Stop event propagation here
+                                }}
                             >
                                 <MoreHorizontal className="h-4 w-4" />
                                 <span className="sr-only">Open menu</span>
                             </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent 
-                            align="end"
-                            className="w-48 bg-bg-primary border border-overlay/10 shadow-lg"
-                        >
-                            <DropdownMenuItem 
+                        <DropdownMenuContent align="end" className="w-[200px]">
+                            <DropdownMenuItem
                                 className="text-text-primary hover:bg-overlay/10 cursor-pointer"
                                 onClick={(e) => {
                                     e.stopPropagation();
-                                    navigate(`/note/${note.id}`);
+                                    navigate(`/note/edit/${note.id}`);
                                 }}
                             >
                                 Edit
                             </DropdownMenuItem>
-                            <DropdownMenuItem 
+                            <DropdownMenuItem
                                 className="text-red-500 hover:bg-overlay/10 cursor-pointer"
                                 onClick={(e) => {
                                     e.stopPropagation();
@@ -87,22 +89,7 @@ export const NoteCard = ({ note }) => {
                 </div>
 
                 <div className="text-sm text-text-primary/60">
-                    {showFullContent ? (
-                        <div className="whitespace-pre-wrap">{content}</div>
-                    ) : (
-                        <>
-                            <div>{firstLine}</div>
-                            {hasMoreContent && (
-                                <Button
-                                    variant="ghost"
-                                    className="px-0 text-xs hover:text-text-primary"
-                                    onClick={handleMoreClick}
-                                >
-                                    Show more
-                                </Button>
-                            )}
-                        </>
-                    )}
+                    {truncatedDescription}
                 </div>
 
                 {note.tags && note.tags.length > 0 && (

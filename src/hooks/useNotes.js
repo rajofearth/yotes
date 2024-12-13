@@ -203,12 +203,43 @@ export function useNotes() {
         }
     }, [driveApi, folderIds?.notes, notes, showToast]);
 
+    const deleteNote = useCallback(async (noteId) => {
+        if (!driveApi || !folderIds?.notes) {
+            throw new Error('Drive API not initialized');
+        }
+    
+        try {
+            // Find the file to delete
+            const response = await driveApi.listFiles(folderIds.notes);
+            const fileToDelete = response.files.find(f => f.name === `${noteId}.json`);
+    
+            if (!fileToDelete) {
+                throw new Error('Note file not found in Google Drive');
+            }
+    
+            // Delete the file
+            await driveApi.deleteFile(fileToDelete.id);
+    
+            // Update local state and cache
+            const updatedNotes = notes.filter(n => n.id !== noteId);
+            setNotes(updatedNotes);
+            localStorage.setItem(CACHE_KEY, JSON.stringify(updatedNotes));
+            localStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString());
+    
+            showToast('Note deleted successfully', 'success');
+        } catch (err) {
+            showToast('Failed to delete note. Please try again.', 'error');
+            throw err;
+        }
+    }, [driveApi, folderIds?.notes, notes, showToast]);
+
     return {
         notes,
         isLoading: isLoading || isDriveLoading,
         error,
         createNote,
         updateNote,
+        deleteNote,
         refreshNotes: () => loadNotes(true)
     };
 } 

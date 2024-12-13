@@ -19,6 +19,7 @@
 
   body {
     @apply bg-bg-primary text-text-primary;
+    overflow-x: hidden; /* Hide horizontal scrollbar */
   }
 }
 

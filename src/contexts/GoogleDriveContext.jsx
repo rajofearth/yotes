@@ -3,6 +3,7 @@ import { supabase } from '../utils/supabaseClient';
 import { useToast } from './ToastContext';
 import { GoogleDriveAPI } from '../utils/googleDrive';
 import { DriveStructureManager } from '../utils/driveStructure';
+import Login from '../pages/login';
 
 const GoogleDriveContext = createContext(null);
 
@@ -25,12 +26,16 @@ export function GoogleDriveProvider({ children }) {
             if (!driveApi) return;
 
             try {
+                if (!accessToken) {
+                    throw new Error('No Google access token found. Please sign in with Google.');
+                }
                 const structureManager = new DriveStructureManager(driveApi);
                 const folders = await structureManager.initializeStructure();
                 setFolderIds(folders);
             } catch (err) {
                 console.error('Failed to initialize drive structure:', err);
                 setError(err);
+                navigate('/login');
                 showToast('Failed to initialize Google Drive structure', 'error');
             }
         }
@@ -44,16 +49,16 @@ export function GoogleDriveProvider({ children }) {
     const refreshToken = async () => {
         try {
             const { data: { session }, error: refreshError } = await supabase.auth.refreshSession();
-            
+
             if (refreshError) throw refreshError;
-            
+
             if (!session?.provider_token) {
                 throw new Error('Failed to refresh Google access token');
             }
 
             setAccessToken(session.provider_token);
             scheduleTokenRefresh(session);
-            
+
         } catch (err) {
             console.error('Token refresh failed:', err);
             setError(err);

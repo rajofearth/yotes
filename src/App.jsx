@@ -8,7 +8,8 @@ import Signup from "./pages/signup"
 import { Toast } from "./components/ui/toast"
 import AuthCallback from './pages/auth/callback'
 import { GoogleDriveProvider } from './contexts/GoogleDriveContext';
-import NoteDetail from './pages/note/[id]';
+import EditNote from './pages/note/edit/[id]';
+import ViewNote from "./pages/note/view/[id]"
 import { ToastProvider } from './contexts/ToastContext';
 import CreateNote from './pages/create';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -84,11 +85,17 @@ function App() {
               </ProtectedRoute>
             }
           />
-          <Route
-            path="/note/:id"
+          <Route path="/note/edit/:id"
             element={
               <ProtectedRoute>
-                <NoteDetail />
+                <EditNote />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="/note/view/:id"
+            element={
+              <ProtectedRoute>
+                <ViewNote />
               </ProtectedRoute>
             }
           />
