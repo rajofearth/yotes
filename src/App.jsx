@@ -13,42 +13,60 @@ import ViewNote from "./pages/note/view/[id]"
 import { ToastProvider } from './contexts/ToastContext';
 import CreateNote from './pages/create';
 import ErrorBoundary from './components/ErrorBoundary';
+import { useNavigate } from 'react-router-dom'; // Import useNavigate
 
 // Protected route component that includes necessary providers
-function ProtectedRoute({ children }) {
+function ProtectedRoute({ children, isLoading }) {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
   useEffect(() => {
+    // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setLoading(false);
+
+      // If no session, navigate here instead of using Navigate component
+      if (!session) {
+        navigate('/login', { replace: true });
+      }
     });
 
+    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
+      if (!session && !loading) {
+        navigate('/login', { replace: true });
+      }
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [navigate, loading]);
 
-  if (loading) {
-    return <div className="min-h-screen bg-bg-primary flex items-center justify-center">
-      <div className="text-text-primary">Loading...</div>
-    </div>;
+  if (loading || isLoading) {
+    return (
+      <div className="min-h-screen bg-bg-primary flex items-center justify-center">
+        <div className="text-text-primary">Loading...</div>
+      </div>
+    );
   }
 
-  if (!session) {
-    return <Navigate to="/login" replace />;
+  // Remove the Navigate component and just return children if we have a session
+  if (session) {
+    return (
+      <GoogleDriveProvider>
+        <ErrorBoundary fallback={<div>Something went wrong with Google Drive integration</div>}>
+          {children}
+        </ErrorBoundary>
+      </GoogleDriveProvider>
+    );
   }
 
-  return (
-    <GoogleDriveProvider>
-      <ErrorBoundary fallback={<div>Something went wrong with Google Drive integration</div>}>
-        {children}
-      </ErrorBoundary>
-    </GoogleDriveProvider>
-  );
+  // Return loading state while navigation happens
+  return <div className="min-h-screen bg-bg-primary flex items-center justify-center">
+    <div className="text-text-primary">Redirecting...</div>
+  </div>;
 }
 
 function App() {
@@ -80,7 +98,7 @@ function App() {
           <Route
             path="/"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute isLoading={isDriveLoading || isNotesLoading}>
                 <Home />
               </ProtectedRoute>
             }

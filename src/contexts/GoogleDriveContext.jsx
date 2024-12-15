@@ -63,6 +63,8 @@ export function GoogleDriveProvider({ children }) {
             console.error('Token refresh failed:', err);
             setError(err);
             showToast('Failed to refresh Google Drive access. Please sign in again.', 'error');
+            // Redirect to login if refresh fails
+            navigate('/login');
         }
     };
 
@@ -85,13 +87,14 @@ export function GoogleDriveProvider({ children }) {
     // Initial setup
     useEffect(() => {
         let mounted = true;
+        let refreshTimer = null;
 
         async function initializeGoogleDrive() {
             try {
                 const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-                
+
                 if (sessionError) throw sessionError;
-                
+
                 if (!session?.provider_token) {
                     throw new Error('No Google access token found. Please sign in with Google.');
                 }
@@ -104,6 +107,8 @@ export function GoogleDriveProvider({ children }) {
                 console.error('Failed to initialize Google Drive:', err);
                 if (mounted) {
                     setError(err);
+                    // Redirect to login if initialization fails
+                    navigate('/login');
                 }
             } finally {
                 if (mounted) {
