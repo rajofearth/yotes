@@ -5,32 +5,11 @@ import { ChevronRight } from 'lucide-react';
 
 export const NotesSection = ({ title, notes = [], sectionKey, refreshNotes }) => {
     const scrollContainerRef = useRef(null);
-    const [isScrolling, setIsScrolling] = useState(false);
-    const [startX, setStartX] = useState(0);
-    const [scrollLeft, setScrollLeft] = useState(0);
     const [showGradient, setShowGradient] = useState(false);
 
     if (!notes || notes.length === 0) {
         return null;
     }
-
-    const handleMouseDown = (e) => {
-        setIsScrolling(true);
-        setStartX(e.pageX - scrollContainerRef.current.offsetLeft);
-        setScrollLeft(scrollContainerRef.current.scrollLeft);
-    };
-
-    const handleMouseMove = (e) => {
-        if (!isScrolling) return;
-        e.preventDefault();
-        const x = e.pageX - scrollContainerRef.current.offsetLeft;
-        const walk = (x - startX) * 2;
-        scrollContainerRef.current.scrollLeft = scrollLeft - walk;
-    };
-
-    const handleMouseUp = () => {
-        setIsScrolling(false);
-    };
 
     const handleScroll = () => {
         const container = scrollContainerRef.current;
@@ -52,7 +31,7 @@ export const NotesSection = ({ title, notes = [], sectionKey, refreshNotes }) =>
     }, [notes]);
 
     return (
-        <section className="space-y-4">
+        <section className="space-y-4 overflow-hidden">
             <div className="flex justify-between items-center">
                 <div className="flex items-baseline gap-2">
                     <h2 className="text-xl font-semibold tracking-tight">{title}</h2>
@@ -71,16 +50,17 @@ export const NotesSection = ({ title, notes = [], sectionKey, refreshNotes }) =>
             <div className="relative">
                 <div 
                     ref={scrollContainerRef}
-                    className="grid grid-flow-col auto-cols-max gap-4 overflow-hidden"
-                    onMouseDown={handleMouseDown}
-                    onMouseMove={handleMouseMove}
-                    onMouseUp={handleMouseUp}
-                    onMouseLeave={handleMouseUp}
+                    className="flex gap-4 overflow-x-auto overflow-y-hidden overscroll-x-contain pb-4 snap-x"
+                    style={{
+                        scrollbarWidth: 'none',
+                        msOverflowStyle: 'none',
+                        '::-webkit-scrollbar': { display: 'none' }
+                    }}
                 >
                     {notes.map(note => (
                         <div 
                             key={note.id} 
-                            className="snap-start min-w-[300px] max-w-[300px]"
+                            className="flex-none w-[300px] snap-start"
                         >
                             <NoteCard note={note} refreshNotes={refreshNotes} />
                         </div>
