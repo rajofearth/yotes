@@ -107,8 +107,8 @@ function App() {
 
   return (
     <ToastProvider>
-      <GoogleDriveProvider>
-        <Router>
+      <Router>
+        <GoogleDriveProvider>
           <Routes>
             <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
             <Route
@@ -135,8 +135,8 @@ function App() {
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
           <Analytics />
+          </GoogleDriveProvider>
         </Router>
-      </GoogleDriveProvider>
     </ToastProvider>
   );
 }

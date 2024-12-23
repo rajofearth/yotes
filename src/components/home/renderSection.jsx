@@ -51,11 +51,6 @@ export const NotesSection = ({ title, notes = [], sectionKey, refreshNotes }) =>
                 <div 
                     ref={scrollContainerRef}
                     className="flex gap-4 overflow-x-auto overflow-y-hidden overscroll-x-contain pb-4 snap-x"
-                    style={{
-                        scrollbarWidth: 'none',
-                        msOverflowStyle: 'none',
-                        '::-webkit-scrollbar': { display: 'none' }
-                    }}
                 >
                     {notes.map(note => (
                         <div 

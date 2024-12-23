@@ -3,7 +3,7 @@ import { supabase } from '../utils/supabaseClient';
 import { useToast } from './ToastContext';
 import { GoogleDriveAPI } from '../utils/googleDrive';
 import { DriveStructureManager } from '../utils/driveStructure';
-import Login from '../pages/login';
+import { useNavigate } from 'react-router-dom';
 
 const GoogleDriveContext = createContext(null);
 
@@ -14,6 +14,7 @@ export function GoogleDriveProvider({ children }) {
     const [refreshTimer, setRefreshTimer] = useState(null);
     const [folderIds, setFolderIds] = useState(null);
     const showToast = useToast();
+    const navigate = useNavigate();
 
     // Create a memoized driveApi instance
     const driveApi = useMemo(() => {
@@ -35,8 +36,12 @@ export function GoogleDriveProvider({ children }) {
             } catch (err) {
                 console.error('Failed to initialize drive structure:', err);
                 setError(err);
+                showToast('Failed to initialize Google Drive structure: ' + err.message, 'error');
+                // Clear local cache
+                localStorage.removeItem('notes_cache');
+                localStorage.removeItem('notes_cache_timestamp');
+                // Redirect to login
                 navigate('/login');
-                showToast('Failed to initialize Google Drive structure', 'error');
             }
         }
 
@@ -63,7 +68,12 @@ export function GoogleDriveProvider({ children }) {
             console.error('Token refresh failed:', err);
             setError(err);
             showToast('Failed to refresh Google Drive access. Please sign in again.', 'error');
-            // Redirect to login if refresh fails
+            // Clear local cache
+            localStorage.removeItem('notes_cache');
+            localStorage.removeItem('notes_cache_timestamp');
+            // Sign out the user
+            await supabase.auth.signOut();
+            // Redirect to login
             navigate('/login');
         }
     };
@@ -93,27 +103,30 @@ export function GoogleDriveProvider({ children }) {
             try {
                 const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
-                if (sessionError) throw sessionError;
+                if (sessionError) {
+                    console.error('Session error:', sessionError);
+                    throw sessionError;
+                }
 
-                if (!session?.provider_token) {
+                if (!session || !session.provider_token) {
                     throw new Error('No Google access token found. Please sign in with Google.');
                 }
 
-                if (mounted) {
-                    setAccessToken(session.provider_token);
-                    scheduleTokenRefresh(session);
-                }
+                setAccessToken(session.provider_token);
+                scheduleTokenRefresh(session);
             } catch (err) {
                 console.error('Failed to initialize Google Drive:', err);
-                if (mounted) {
-                    setError(err);
-                    // Redirect to login if initialization fails
-                    navigate('/login');
-                }
+                setError(err);
+                showToast('Failed to initialize Google Drive: ' + err.message, 'error');
+                // Clear local cache
+                localStorage.removeItem('notes_cache');
+                localStorage.removeItem('notes_cache_timestamp');
+            // Sign out the user
+            await supabase.auth.signOut();
+                // Redirect to login
+                navigate('/login');
             } finally {
-                if (mounted) {
-                    setIsLoading(false);
-                }
+                setIsLoading(false);
             }
         }
 
@@ -129,7 +142,7 @@ export function GoogleDriveProvider({ children }) {
 
     // Listen for auth state changes
     useEffect(() => {
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
             if (event === 'SIGNED_OUT') {
                 setAccessToken(null);
                 setFolderIds(null);
@@ -156,7 +169,7 @@ export function GoogleDriveProvider({ children }) {
     };
 
     return (
-        <GoogleDriveContext.Provider value={value}>
+        <GoogleDriveContext.Provider value={{ isLoading, error, driveApi, folderIds }}>
             {children}
         </GoogleDriveContext.Provider>
     );
@@ -168,4 +181,4 @@ export function useGoogleDrive() {
         throw new Error('useGoogleDrive must be used within a GoogleDriveProvider');
     }
     return context;
-} 
+}
