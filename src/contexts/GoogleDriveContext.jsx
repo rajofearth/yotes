@@ -40,6 +40,8 @@ export function GoogleDriveProvider({ children }) {
                 // Clear local cache
                 localStorage.removeItem('notes_cache');
                 localStorage.removeItem('notes_cache_timestamp');
+                // Sign out the user
+                await supabase.auth.signOut();
                 // Redirect to login
                 navigate('/login');
             }
@@ -63,7 +65,6 @@ export function GoogleDriveProvider({ children }) {
 
             setAccessToken(session.provider_token);
             scheduleTokenRefresh(session);
-
         } catch (err) {
             console.error('Token refresh failed:', err);
             setError(err);
@@ -96,9 +97,6 @@ export function GoogleDriveProvider({ children }) {
 
     // Initial setup
     useEffect(() => {
-        let mounted = true;
-        let refreshTimer = null;
-
         async function initializeGoogleDrive() {
             try {
                 const { data: { session }, error: sessionError } = await supabase.auth.getSession();
@@ -121,8 +119,8 @@ export function GoogleDriveProvider({ children }) {
                 // Clear local cache
                 localStorage.removeItem('notes_cache');
                 localStorage.removeItem('notes_cache_timestamp');
-            // Sign out the user
-            await supabase.auth.signOut();
+                // Sign out the user
+                await supabase.auth.signOut();
                 // Redirect to login
                 navigate('/login');
             } finally {
@@ -131,13 +129,6 @@ export function GoogleDriveProvider({ children }) {
         }
 
         initializeGoogleDrive();
-
-        return () => {
-            mounted = false;
-            if (refreshTimer) {
-                clearTimeout(refreshTimer);
-            }
-        };
     }, []);
 
     // Listen for auth state changes

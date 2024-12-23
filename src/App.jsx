@@ -73,12 +73,7 @@ function ProtectedRoute({ children }) {
     );
   }
 
-  // Return loading state while navigation happens
-  return (
-    <div className="min-h-screen bg-bg-primary flex items-center justify-center">
-      <div className="text-text-primary">Redirecting...</div>
-    </div>
-  );
+  return null; // Return null if there's no session
 }
 
 function App() {
@@ -98,45 +93,23 @@ function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Check system preference and set dark mode
-  useEffect(() => {
-    if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-      document.documentElement.classList.add('dark');
-    }
-  }, []);
-
   return (
     <ToastProvider>
       <Router>
         <GoogleDriveProvider>
           <Routes>
             <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
-            <Route
-              path="/note/edit/:id"
-              element={<ProtectedRoute><EditNote /></ProtectedRoute>}
-            />
-            <Route
-              path="/note/view/:id"
-              element={<ProtectedRoute><ViewNote /></ProtectedRoute>}
-            />
-            <Route
-              path="/login"
-              element={!session ? <Login /> : <Navigate to="/" replace />}
-            />
-            <Route
-              path="/signup"
-              element={!session ? <Signup /> : <Navigate to="/" replace />}
-            />
+            <Route path="/note/edit/:id" element={<ProtectedRoute><EditNote /></ProtectedRoute>} />
+            <Route path="/note/view/:id" element={<ProtectedRoute><ViewNote /></ProtectedRoute>} />
+            <Route path="/login" element={!session ? <Login /> : <Navigate to="/" replace />} />
+            <Route path="/signup" element={!session ? <Signup /> : <Navigate to="/" replace />} />
             <Route path="/auth/callback" element={<AuthCallback />} />
-            <Route
-              path="/create"
-              element={<ProtectedRoute><CreateNote /></ProtectedRoute>}
-            />
+            <Route path="/create" element={<ProtectedRoute><CreateNote /></ProtectedRoute>} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
           <Analytics />
-          </GoogleDriveProvider>
-        </Router>
+        </GoogleDriveProvider>
+      </Router>
     </ToastProvider>
   );
 }
