@@ -44,7 +44,7 @@ export default function EditNote() {
                 updatedAt: new Date().toISOString()
             });
             showToast('Note updated successfully', 'success');
-            navigate('/', { state: { refresh: true } });
+            navigate('/'); // Simplified navigation without forced refresh
         } catch (error) {
             showToast('Failed to update note', 'error');
         } finally {

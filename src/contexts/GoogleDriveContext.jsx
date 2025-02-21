@@ -16,12 +16,10 @@ export function GoogleDriveProvider({ children }) {
     const showToast = useToast();
     const navigate = useNavigate();
 
-    // Create a memoized driveApi instance
     const driveApi = useMemo(() => {
         return accessToken ? new GoogleDriveAPI(accessToken) : null;
     }, [accessToken]);
 
-    // Function to refresh the token
     const refreshToken = async () => {
         try {
             const { data: { session }, error: refreshError } = await supabase.auth.refreshSession();
@@ -42,7 +40,6 @@ export function GoogleDriveProvider({ children }) {
         }
     };
 
-    // Function to schedule token refresh
     const scheduleTokenRefresh = (session) => {
         if (refreshTimer) {
             clearTimeout(refreshTimer);
@@ -55,7 +52,6 @@ export function GoogleDriveProvider({ children }) {
         setRefreshTimer(timer);
     };
 
-    // Initial setup and drive structure initialization
     useEffect(() => {
         async function initializeGoogleDrive() {
             try {
@@ -66,28 +62,28 @@ export function GoogleDriveProvider({ children }) {
                     setIsLoading(false);
                     return;
                 }
-                // If no session exists (e.g., on login page), exit quietly
                 if (!session) {
                     setIsLoading(false);
                     return;
                 }
-                // If session exists but no provider_token, that’s an error
                 if (!session.provider_token) {
-                    throw new Error('No Google access token found. Please sign in with Google.');
+                    console.error('No Google access token found');
+                    setError(new Error('No Google access token found. Please sign in with Google.'));
+                    setIsLoading(false);
+                    return; // Don’t sign out here; let user retry login
                 }
                 setAccessToken(session.provider_token);
                 scheduleTokenRefresh(session);
-                // Initialize drive structure
                 const structureManager = new DriveStructureManager(new GoogleDriveAPI(session.provider_token));
                 const folders = await structureManager.initializeStructure();
                 setFolderIds(folders);
+                console.log('Google Drive initialized - Folder IDs:', folders);
             } catch (err) {
                 console.error('Failed to initialize Google Drive:', err);
                 setError(err);
-                // Only show toast and sign out if there’s a session
-                const { data: { session } } = await supabase.auth.getSession();
-                if (session) {
-                    showToast('Failed to initialize Google Drive: ' + err.message, 'error');
+                // Only sign out if critical (e.g., folder structure fails), not for transient errors
+                if (err.message.includes('structure')) {
+                    showToast('Failed to initialize Google Drive structure: ' + err.message, 'error');
                     localStorage.removeItem('notes_cache');
                     localStorage.removeItem('notes_cache_timestamp');
                     await supabase.auth.signOut();
@@ -100,7 +96,6 @@ export function GoogleDriveProvider({ children }) {
         initializeGoogleDrive();
     }, [navigate, showToast]);
 
-    // Listen for auth state changes
     useEffect(() => {
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
             if (_event === 'SIGNED_OUT') {

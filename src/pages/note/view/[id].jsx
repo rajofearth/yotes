@@ -55,7 +55,7 @@ export default function ViewNote() {
                         <div className="flex flex-wrap gap-2">
                             {note.tags.map((tag, index) => (
                                 <Badge key={index} variant="secondary">
-                                    {tag}
+                                    {tag.name}
                                 </Badge>
                             ))}
                         </div>

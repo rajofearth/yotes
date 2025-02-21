@@ -85,11 +85,11 @@ export const NoteCard = ({ note, refreshNotes }) => {
                 </div>
                 {note.tags && note.tags.length > 0 && (
                     <div className="flex flex-wrap gap-1">
-                        {note.tags.map((tagId) => {
+                        {note.tags.map((tagId, index) => {
                             const tag = tags.find(t => t.id === tagId);
                             return tag ? (
                                 <span
-                                    key={tagId}
+                                    key={`${note.id}-tag-${tagId}-${index}`} // Unique key combining note ID, tag ID, and index
                                     className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-overlay/10 text-text-primary/80"
                                 >
                                     {tag.name}

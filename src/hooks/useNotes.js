@@ -27,7 +27,10 @@ export function useNotes() {
     }, []);
 
     const loadData = useCallback(async (force = false) => {
+        console.log('loadData called - Force:', force, 'Drive API:', !!driveApi, 'Folder IDs:', folderIds);
         if (!driveApi || !folderIds?.notes || !folderIds?.tags) {
+            console.log('Missing driveApi or folderIds');
+            setError(new Error('Drive API not initialized'));
             setIsLoading(false);
             return;
         }
@@ -36,14 +39,41 @@ export function useNotes() {
         setError(null);
 
         try {
-            // Load tags from tags.json
+            // Load tags
             if (force || shouldRefreshCache(TAGS_CACHE_KEY)) {
-                const tagsResponse = await driveApi.listFiles(folderIds.tags);
+                console.log('Fetching tags from Google Drive...');
+                let tagsResponse;
+                try {
+                    tagsResponse = await driveApi.listFiles(folderIds.tags);
+                } catch (err) {
+                    console.error('Failed to list tags files:', err);
+                    throw new Error('Unable to list tags folder');
+                }
+                console.log('Tags response:', tagsResponse);
                 const tagsFile = tagsResponse.files.find(f => f.name === 'tags.json');
                 let tagsData = [];
                 if (tagsFile) {
-                    const tagsBlob = (await driveApi.downloadFiles([tagsFile.id]))[0];
-                    if (tagsBlob) tagsData = JSON.parse(await tagsBlob.text());
+                    console.log('Downloading tags.json...');
+                    let tagsBlob;
+                    try {
+                        tagsBlob = (await driveApi.downloadFiles([tagsFile.id]))[0];
+                    } catch (err) {
+                        console.error('Failed to download tags.json:', err);
+                        throw new Error('Unable to download tags.json');
+                    }
+                    if (tagsBlob) {
+                        try {
+                            tagsData = JSON.parse(await tagsBlob.text());
+                            console.log('Tags loaded:', tagsData);
+                        } catch (err) {
+                            console.error('Failed to parse tags.json:', err);
+                            throw new Error('Invalid tags.json format');
+                        }
+                    } else {
+                        console.log('tags.json blob is null');
+                    }
+                } else {
+                    console.log('No tags.json found, using empty tags');
                 }
                 setTags(tagsData);
                 localStorage.setItem(TAGS_CACHE_KEY, JSON.stringify(tagsData));
@@ -52,35 +82,64 @@ export function useNotes() {
 
             // Load notes
             if (force || shouldRefreshCache(CACHE_KEY)) {
-                const notesResponse = await driveApi.listFiles(folderIds.notes);
-                const notesBlobs = await driveApi.downloadFiles(notesResponse.files.map(f => f.id));
-                const notesData = await Promise.all(
-                    notesBlobs.filter(Boolean).map(async (blob) => {
-                        try {
-                            return JSON.parse(await blob.text());
-                        } catch {
-                            return null;
-                        }
-                    })
-                );
+                console.log('Fetching notes from Google Drive...');
+                let notesResponse;
+                try {
+                    notesResponse = await driveApi.listFiles(folderIds.notes);
+                } catch (err) {
+                    console.error('Failed to list notes files:', err);
+                    throw new Error('Unable to list notes folder');
+                }
+                console.log('Notes response:', notesResponse);
+                let notesData = [];
+                if (notesResponse.files.length > 0) {
+                    console.log('Downloading notes...');
+                    let notesBlobs;
+                    try {
+                        notesBlobs = await driveApi.downloadFiles(notesResponse.files.map(f => f.id));
+                    } catch (err) {
+                        console.error('Failed to download notes:', err);
+                        throw new Error('Unable to download notes');
+                    }
+                    console.log('Notes blobs:', notesBlobs.length);
+                    notesData = await Promise.all(
+                        notesBlobs.filter(Boolean).map(async (blob, index) => {
+                            try {
+                                return JSON.parse(await blob.text());
+                            } catch (err) {
+                                console.error(`Failed to parse note at index ${index}:`, err);
+                                return null;
+                            }
+                        })
+                    );
+                    console.log('Raw notes data:', notesData);
+                } else {
+                    console.log('No notes found in folder');
+                }
                 const validNotes = notesData
                     .filter(note => note && note.id && note.createdAt && note.updatedAt)
                     .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+                console.log('Valid notes:', validNotes);
                 setNotes(validNotes);
                 localStorage.setItem(CACHE_KEY, JSON.stringify(validNotes));
                 localStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString());
             }
         } catch (err) {
+            console.error('Error in loadData:', err);
             setError(err);
-            showToast('Failed to load data', 'error');
+            showToast('Failed to load data: ' + err.message, 'error');
         } finally {
+            console.log('Setting isLoading to false');
             setIsLoading(false);
         }
     }, [driveApi, folderIds, shouldRefreshCache, showToast]);
 
     useEffect(() => {
-        if (!isDriveLoading) loadData();
-    }, [loadData, isDriveLoading]);
+        console.log('useNotes effect - isDriveLoading:', isDriveLoading);
+        if (!isDriveLoading) {
+            loadData();
+        }
+    }, [isDriveLoading, loadData]);
 
     const createNote = useCallback(async (noteData) => {
         if (!driveApi || !folderIds?.notes) {
