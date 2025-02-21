@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useNotes } from '../hooks/useNotes';
 import { useToast } from '../contexts/ToastContext';
@@ -10,7 +10,7 @@ import { Textarea } from '../components/ui/textarea';
 
 export default function CreateNote() {
     const navigate = useNavigate();
-    const { createNote } = useNotes();
+    const { createNote, tags, createTag } = useNotes();
     const showToast = useToast();
     const [isSaving, setIsSaving] = useState(false);
     const [hasChanges, setHasChanges] = useState(false);
@@ -18,19 +18,19 @@ export default function CreateNote() {
         title: '',
         description: '',
         content: '',
-        tags: []
+        tags: [] // Stores tag IDs
     });
 
-    // Track changes
     useEffect(() => {
         if (note.title || note.description || note.content || note.tags.length > 0) {
             setHasChanges(true);
+        } else {
+            setHasChanges(false);
         }
     }, [note]);
 
     const handleSave = async () => {
         if (!hasChanges) return;
-        
         setIsSaving(true);
         try {
             await createNote({
@@ -47,35 +47,55 @@ export default function CreateNote() {
         }
     };
 
-    const handleTagInput = (e) => {
+    const handleTagToggle = (tagId) => {
+        setNote(prev => ({
+            ...prev,
+            tags: prev.tags.includes(tagId)
+                ? prev.tags.filter(id => id !== tagId)
+                : [...prev.tags, tagId]
+        }));
+    };
+
+    const handleTagInput = async (e) => {
         if (e.key === 'Enter' && e.target.value) {
             e.preventDefault();
-            const newTag = e.target.value.trim();
-            if (!note.tags.includes(newTag)) {
-                setNote(prev => ({
-                    ...prev,
-                    tags: [...prev.tags, newTag]
-                }));
+            const newTagName = e.target.value.trim();
+            const existingTag = tags.find(tag => tag.name.toLowerCase() === newTagName.toLowerCase());
+            if (existingTag) {
+                if (!note.tags.includes(existingTag.id)) {
+                    setNote(prev => ({
+                        ...prev,
+                        tags: [...prev.tags, existingTag.id]
+                    }));
+                }
+            } else {
+                try {
+                    const newTag = await createTag({ name: newTagName });
+                    setNote(prev => ({
+                        ...prev,
+                        tags: [...prev.tags, newTag.id]
+                    }));
+                } catch (error) {
+                    showToast('Failed to create tag', 'error');
+                }
             }
             e.target.value = '';
         }
     };
 
-    const removeTag = (tagToRemove) => {
+    const removeTag = (tagId) => {
         setNote(prev => ({
             ...prev,
-            tags: prev.tags.filter(tag => tag !== tagToRemove)
+            tags: prev.tags.filter(id => id !== tagId)
         }));
     };
 
     const generateWithAI = async () => {
-        // AI generation logic here
         showToast('AI generation coming soon!', 'info');
     };
 
     return (
         <div className="min-h-screen bg-bg-primary">
-            {/* Header */}
             <header className="border-b border-overlay/10">
                 <div className="max-w-[1920px] mx-auto px-4 py-4 flex items-center justify-between">
                     <div className="flex items-center gap-4">
@@ -105,10 +125,7 @@ export default function CreateNote() {
                     </Button>
                 </div>
             </header>
-
-            {/* Main Content */}
             <main className="max-w-[1920px] mx-auto px-4 py-8 space-y-8">
-                {/* Description and Tags */}
                 <div className="space-y-4">
                     <div className="flex items-center gap-2">
                         <Input
@@ -129,32 +146,49 @@ export default function CreateNote() {
                     </div>
                     <div className="space-y-2">
                         <div className="flex flex-wrap gap-2">
-                            {note.tags.map((tag, index) => (
-                                <Badge 
-                                    key={index}
-                                    variant="secondary"
-                                    className="flex items-center gap-1"
-                                >
-                                    {tag}
-                                    <button
-                                        onClick={() => removeTag(tag)}
-                                        className="ml-1 hover:text-red-500"
+                            {note.tags.map((tagId) => {
+                                const tag = tags.find(t => t.id === tagId);
+                                return tag ? (
+                                    <Badge
+                                        key={tagId}
+                                        variant="secondary"
+                                        className="flex items-center gap-1"
                                     >
-                                        ×
-                                    </button>
-                                </Badge>
-                            ))}
+                                        {tag.name}
+                                        <button
+                                            onClick={() => removeTag(tagId)}
+                                            className="ml-1 hover:text-red-500"
+                                        >
+                                            ×
+                                        </button>
+                                    </Badge>
+                                ) : null;
+                            })}
                         </div>
-                        <Input
-                            type="text"
-                            placeholder="Add tags (press Enter)"
-                            className="w-full"
-                            onKeyDown={handleTagInput}
-                        />
+                        <div className="space-y-2">
+                            {tags.length > 0 && (
+                                <div className="flex flex-wrap gap-2">
+                                    {tags.map(tag => (
+                                        <label key={tag.id} className="flex items-center gap-1">
+                                            <input
+                                                type="checkbox"
+                                                checked={note.tags.includes(tag.id)}
+                                                onChange={() => handleTagToggle(tag.id)}
+                                            />
+                                            {tag.name}
+                                        </label>
+                                    ))}
+                                </div>
+                            )}
+                            <Input
+                                type="text"
+                                placeholder="Add new tag (press Enter)"
+                                className="w-full"
+                                onKeyDown={handleTagInput}
+                            />
+                        </div>
                     </div>
                 </div>
-
-                {/* Note Content */}
                 <Textarea
                     placeholder="Start writing your note..."
                     className="min-h-[50vh] bg-overlay/5 border-overlay/10 resize-none"

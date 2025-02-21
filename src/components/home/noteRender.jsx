@@ -15,22 +15,20 @@ import { useToast } from '../../contexts/ToastContext';
 export const NoteCard = ({ note, refreshNotes }) => {
     const [showFulldescription, setShowFulldescription] = useState(false);
     const navigate = useNavigate();
-    const { deleteNote } = useNotes();
+    const { deleteNote, tags } = useNotes();
     const showToast = useToast();
 
     if (!note) return null;
 
     const title = note.title || 'Untitled Note';
     const description = note.description || '';
-
-    const MAX_DESCRIPTION_LENGTH = 100; // Set the maximum length for the truncated description
-
+    const MAX_DESCRIPTION_LENGTH = 100;
     const truncatedDescription = description.length > MAX_DESCRIPTION_LENGTH
         ? description.substring(0, MAX_DESCRIPTION_LENGTH) + '...'
         : description;
 
     const handleMoreClick = (e) => {
-        e.stopPropagation(); // Prevent card click when clicking menu
+        e.stopPropagation();
         setShowFulldescription(true);
     };
 
@@ -57,9 +55,7 @@ export const NoteCard = ({ note, refreshNotes }) => {
                             <Button
                                 variant="ghost"
                                 className="h-8 w-8 p-0 text-text-primary/60 hover:text-text-primary"
-                                onClick={(e) => {
-                                    e.stopPropagation(); // Stop event propagation here
-                                }}
+                                onClick={(e) => e.stopPropagation()}
                             >
                                 <MoreHorizontal className="h-4 w-4" />
                                 <span className="sr-only">Open menu</span>
@@ -77,31 +73,29 @@ export const NoteCard = ({ note, refreshNotes }) => {
                             </DropdownMenuItem>
                             <DropdownMenuItem
                                 className="text-red-500 hover:bg-overlay/10 cursor-pointer"
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDelete(e);
-                                }}
+                                onClick={handleDelete}
                             >
                                 Delete
                             </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
                 </div>
-
                 <div className="text-sm text-text-primary/60">
                     {truncatedDescription}
                 </div>
-
                 {note.tags && note.tags.length > 0 && (
                     <div className="flex flex-wrap gap-1">
-                        {note.tags.map((tag, index) => (
-                            <span
-                                key={index}
-                                className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-overlay/10 text-text-primary/80"
-                            >
-                                {tag}
-                            </span>
-                        ))}
+                        {note.tags.map((tagId) => {
+                            const tag = tags.find(t => t.id === tagId);
+                            return tag ? (
+                                <span
+                                    key={tagId}
+                                    className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-overlay/10 text-text-primary/80"
+                                >
+                                    {tag.name}
+                                </span>
+                            ) : null;
+                        })}
                     </div>
                 )}
             </div>
@@ -109,7 +103,6 @@ export const NoteCard = ({ note, refreshNotes }) => {
     );
 };
 
-// Helper function to maintain backward compatibility
 export const renderNoteCard = (note) => {
     return <NoteCard note={note} />;
 };

@@ -18,6 +18,8 @@ import AuthCallback from './pages/auth/callback';
 import CreateNote from './pages/create';
 import EditNote from './pages/note/edit/[id]';
 import ViewNote from './pages/note/view/[id]';
+import SectionView from './pages/section/[id]';
+import Settings from './pages/settings';
 import ErrorBoundary from './components/ErrorBoundary';
 
 function ProtectedRoute({ children }) {
@@ -28,18 +30,13 @@ function ProtectedRoute({ children }) {
   const { isLoading: isNotesLoading } = useNotes();
 
   useEffect(() => {
-    // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setLoading(false);
-
-      // If no session, navigate here instead of using Navigate component
       if (!session) {
         navigate('/login', { replace: true });
       }
     });
-
-    // Listen for auth changes
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -48,7 +45,6 @@ function ProtectedRoute({ children }) {
         navigate('/login', { replace: true });
       }
     });
-
     return () => subscription.unsubscribe();
   }, [navigate, loading]);
 
@@ -60,20 +56,16 @@ function ProtectedRoute({ children }) {
     );
   }
 
-  // Remove the Navigate component and just return children if we have a session
   if (session) {
     return (
       <ErrorBoundary
-        fallback={
-          <div>Something went wrong with Google Drive integration</div>
-        }
+        fallback={<div>Something went wrong with Google Drive integration</div>}
       >
         {children}
       </ErrorBoundary>
     );
   }
-
-  return null; // Return null if there's no session
+  return null;
 }
 
 function App() {
@@ -83,13 +75,11 @@ function App() {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
     });
-
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
     });
-
     return () => subscription.unsubscribe();
   }, []);
 
@@ -101,6 +91,8 @@ function App() {
             <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
             <Route path="/note/edit/:id" element={<ProtectedRoute><EditNote /></ProtectedRoute>} />
             <Route path="/note/view/:id" element={<ProtectedRoute><ViewNote /></ProtectedRoute>} />
+            <Route path="/section/:id" element={<ProtectedRoute><SectionView /></ProtectedRoute>} />
+            <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
             <Route path="/login" element={!session ? <Login /> : <Navigate to="/" replace />} />
             <Route path="/signup" element={!session ? <Signup /> : <Navigate to="/" replace />} />
             <Route path="/auth/callback" element={<AuthCallback />} />
