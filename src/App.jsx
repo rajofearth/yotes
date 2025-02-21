@@ -13,7 +13,6 @@ import { ToastProvider } from './contexts/ToastContext';
 import { useNotes } from './hooks/useNotes';
 import Home from './pages/home';
 import Login from './pages/login';
-import Signup from './pages/signup';
 import AuthCallback from './pages/auth/callback';
 import CreateNote from './pages/create';
 import EditNote from './pages/note/edit/[id]';
@@ -100,7 +99,6 @@ function App() {
             <Route path="/section/:id" element={<ProtectedRoute><SectionView /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
             <Route path="/login" element={!session ? <Login /> : <Navigate to="/" replace />} />
-            <Route path="/signup" element={!session ? <Signup /> : <Navigate to="/" replace />} />
             <Route path="/auth/callback" element={<AuthCallback />} />
             <Route path="/create" element={<ProtectedRoute><CreateNote /></ProtectedRoute>} />
             <Route path="*" element={<Navigate to="/" replace />} />
