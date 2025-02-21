@@ -26,7 +26,7 @@ export default function Home() {
 
     // Centralized filtering logic
     const applyFiltersAndSearch = useCallback((notesList, query, tagIds) => {
-        console.log('Applying filters - Notes:', notesList.length, 'Query:', query, 'Tag IDs:', tagIds);
+        //console.log('Applying filters - Notes:', notesList.length, 'Query:', query, 'Tag IDs:', tagIds);
         let filtered = [...notesList];
 
         // Apply tag filter
@@ -46,15 +46,15 @@ export default function Home() {
             );
         }
 
-        console.log('Filtered notes result:', filtered.length);
+        //console.log('Filtered notes result:', filtered.length);
         setFilteredNotes(filtered);
     }, []);
 
     // Initialize and handle refresh
     useEffect(() => {
-        console.log('useEffect - Notes:', notes.length, 'Query:', searchQuery, 'Tags:', selectedTagIds);
+        //console.log('useEffect - Notes:', notes.length, 'Query:', searchQuery, 'Tags:', selectedTagIds);
         if (location.state?.refresh) {
-            console.log('Refreshing data due to location state');
+            //console.log('Refreshing data due to location state');
             refreshData();
         }
         applyFiltersAndSearch(notes, searchQuery, selectedTagIds);
@@ -63,7 +63,7 @@ export default function Home() {
     // Debounced search handler
     const handleSearch = useCallback(
         debounce((query) => {
-            console.log('handleSearch triggered - Query:', query);
+            //console.log('handleSearch triggered - Query:', query);
             setSearchQuery(query);
         }, 300),
         []
@@ -71,7 +71,7 @@ export default function Home() {
 
     // Handle tag filtering
     const handleFilterChange = (tagIds) => {
-        console.log('handleFilterChange - Selected tag IDs:', tagIds);
+        //console.log('handleFilterChange - Selected tag IDs:', tagIds);
         // Default to 'all' if no tags are selected
         const finalTagIds = tagIds.length === 0 ? ['all'] : tagIds;
         setSelectedTagIds(finalTagIds);

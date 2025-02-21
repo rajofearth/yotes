@@ -9,12 +9,14 @@ import {
 } from "../ui/dropdown-menu";
 import { Filter } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useNotes } from '../../hooks/useNotes';
 
 export const TagFilters = ({ onFilterChange }) => {
     const { tags, createTag } = useNotes();
     const [selectedTags, setSelectedTags] = useState(['all']);
-
+    const navigate = useNavigate();
+    
     // Sync selectedTags with onFilterChange and default to 'all' if empty
     useEffect(() => {
         const finalTags = selectedTags.length === 0 ? ['all'] : selectedTags;
@@ -83,7 +85,7 @@ export const TagFilters = ({ onFilterChange }) => {
                         </DropdownMenuCheckboxItem>
                     ))}
                     <DropdownMenuSeparator className="bg-overlay/10" />
-                    <DropdownMenuItem onClick={handleManageTags}>
+                    <DropdownMenuItem onClick={() => navigate('/settings')}>
                         Manage tags...
                     </DropdownMenuItem>
                 </DropdownMenuContent>

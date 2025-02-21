@@ -27,9 +27,9 @@ export function useNotes() {
     }, []);
 
     const loadData = useCallback(async (force = false) => {
-        console.log('loadData called - Force:', force, 'Drive API:', !!driveApi, 'Folder IDs:', folderIds, 'Signed Out:', isSignedOut);
+        //console.log('loadData called - Force:', force, 'Drive API:', !!driveApi, 'Folder IDs:', folderIds, 'Signed Out:', isSignedOut);
         if (!driveApi || !folderIds?.notes || !folderIds?.tags || isSignedOut) {
-            console.log('Skipping loadData - Missing driveApi, folderIds, or signed out');
+           // console.log('Skipping loadData - Missing driveApi, folderIds, or signed out');
             setError(isSignedOut ? null : new Error('Drive API not initialized'));
             setIsLoading(false);
             return;
@@ -48,11 +48,11 @@ export function useNotes() {
                     console.error('Failed to list tags files:', err);
                     throw new Error('Unable to list tags folder');
                 }
-                console.log('Tags response:', tagsResponse);
+                //console.log('Tags response:', tagsResponse);
                 const tagsFile = tagsResponse.files.find(f => f.name === 'tags.json');
                 let tagsData = [];
                 if (tagsFile) {
-                    console.log('Downloading tags.json...');
+                   // console.log('Downloading tags.json...');
                     let tagsBlob;
                     try {
                         tagsBlob = (await driveApi.downloadFiles([tagsFile.id]))[0];
@@ -63,16 +63,18 @@ export function useNotes() {
                     if (tagsBlob) {
                         try {
                             tagsData = JSON.parse(await tagsBlob.text());
-                            console.log('Tags loaded:', tagsData);
+                           // console.log('Tags loaded:', tagsData);
                         } catch (err) {
                             console.error('Failed to parse tags.json:', err);
                             throw new Error('Invalid tags.json format');
                         }
                     } else {
-                        console.log('tags.json blob is null');
+                       // console.log('tags.json blob is null');
+                        return
                     }
                 } else {
-                    console.log('No tags.json found, using empty tags');
+                    //console.log('No tags.json found, using empty tags');
+                    return
                 }
                 setTags(tagsData);
                 localStorage.setItem(TAGS_CACHE_KEY, JSON.stringify(tagsData));
@@ -88,10 +90,10 @@ export function useNotes() {
                     console.error('Failed to list notes files:', err);
                     throw new Error('Unable to list notes folder');
                 }
-                console.log('Notes response:', notesResponse);
+                //console.log('Notes response:', notesResponse);
                 let notesData = [];
                 if (notesResponse.files.length > 0) {
-                    console.log('Downloading notes...');
+                    //console.log('Downloading notes...');
                     let notesBlobs;
                     try {
                         notesBlobs = await driveApi.downloadFiles(notesResponse.files.map(f => f.id));
@@ -99,7 +101,7 @@ export function useNotes() {
                         console.error('Failed to download notes:', err);
                         throw new Error('Unable to download notes');
                     }
-                    console.log('Notes blobs:', notesBlobs.length);
+                    //console.log('Notes blobs:', notesBlobs.length);
                     notesData = await Promise.all(
                         notesBlobs.filter(Boolean).map(async (blob, index) => {
                             try {
@@ -110,14 +112,14 @@ export function useNotes() {
                             }
                         })
                     );
-                    console.log('Raw notes data:', notesData);
+                    //console.log('Raw notes data:', notesData);
                 } else {
                     console.log('No notes found in folder');
                 }
                 const validNotes = notesData
                     .filter(note => note && note.id && note.createdAt && note.updatedAt)
                     .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
-                console.log('Valid notes:', validNotes);
+                //console.log('Valid notes:', validNotes);
                 setNotes(validNotes);
                 localStorage.setItem(CACHE_KEY, JSON.stringify(validNotes));
                 localStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString());
@@ -127,13 +129,13 @@ export function useNotes() {
             setError(err);
             showToast('Failed to load data: ' + err.message, 'error');
         } finally {
-            console.log('Setting isLoading to false');
+           // console.log('Setting isLoading to false');
             setIsLoading(false);
         }
     }, [driveApi, folderIds, isSignedOut, shouldRefreshCache, showToast]);
 
     useEffect(() => {
-        console.log('useNotes effect - isDriveLoading:', isDriveLoading, 'Signed Out:', isSignedOut);
+        //console.log('useNotes effect - isDriveLoading:', isDriveLoading, 'Signed Out:', isSignedOut);
         if (!isDriveLoading && !isSignedOut) {
             loadData();
         } else if (isSignedOut) {

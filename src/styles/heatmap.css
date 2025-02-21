@@ -1,0 +1,72 @@
+/* Default styles for desktop */
+.react-calendar-heatmap {
+    width: 100%;
+    max-width: 100%;
+}
+
+.heatmap-container {
+    min-width: 700px; /* Minimum width to ensure full heatmap visibility on desktop */
+}
+
+.react-calendar-heatmap .color-empty {
+    fill: #ebedf0; /* Matches GitHub’s empty color (gray) */
+}
+
+.react-calendar-heatmap .color-scale-1 {
+    fill: #d6e685; /* Lightest green, 1 note */
+}
+
+.react-calendar-heatmap .color-scale-2 {
+    fill: #8cc665; /* Medium green, 2 notes */
+}
+
+.react-calendar-heatmap .color-scale-3 {
+    fill: #44a340; /* Darker green, 3 notes */
+}
+
+.react-calendar-heatmap .color-scale-4 {
+    fill: #1e6823; /* Darkest green, 4+ notes */
+}
+
+.react-calendar-heatmap text {
+    fill: #9ca3af; /* Matches text-text-primary/60 */
+    font-size: 12px;
+}
+
+.react-calendar-heatmap .react-calendar-heatmap-month-label {
+    fill: #9ca3af;
+    font-size: 12px;
+}
+
+.react-calendar-heatmap .react-calendar-heatmap-weekday-label {
+    fill: #9ca3af;
+    font-size: 12px;
+}
+
+/* Mobile-specific styles (e.g., screens smaller than 768px) */
+@media (max-width: 768px) {
+    .heatmap-container {
+        min-width: 700px; /* Ensure full heatmap width, enabling horizontal scroll */
+    }
+
+    .react-calendar-heatmap {
+        width: 100%;
+        max-width: 100%;
+        overflow-x: auto; /* Force horizontal scrolling on mobile */
+        padding: 0.5rem;
+    }
+
+    .react-calendar-heatmap rect {
+        width: 12px !important; /* Reduce square size for mobile */
+        height: 12px !important;
+    }
+
+    .react-calendar-heatmap .react-calendar-heatmap-month-label,
+    .react-calendar-heatmap .react-calendar-heatmap-weekday-label {
+        font-size: 10px; /* Smaller labels for mobile */
+    }
+
+    .react-calendar-heatmap text {
+        font-size: 10px; /* Smaller text for tooltips if needed */
+    }
+}

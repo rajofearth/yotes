@@ -82,9 +82,9 @@ export function GoogleDriveProvider({ children }) {
                 const structureManager = new DriveStructureManager(new GoogleDriveAPI(session.provider_token));
                 const folders = await structureManager.initializeStructure();
                 setFolderIds(folders);
-                console.log('Google Drive initialized - Folder IDs:', folders);
+               // console.log('Google Drive initialized - Folder IDs:', folders);
             } catch (err) {
-                console.error('Failed to initialize Google Drive:', err);
+                //console.error('Failed to initialize Google Drive:', err);
                 setError(err);
                 if (err.message.includes('structure')) {
                     showToast('Failed to initialize Google Drive structure: ' + err.message, 'error');
@@ -103,7 +103,7 @@ export function GoogleDriveProvider({ children }) {
 
     useEffect(() => {
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-            console.log('Auth state changed:', _event);
+            //console.log('Auth state changed:', _event);
             if (_event === 'SIGNED_OUT') {
                 setAccessToken(null);
                 setFolderIds(null);
