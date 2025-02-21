@@ -13,14 +13,16 @@ export function GoogleDriveProvider({ children }) {
     const [accessToken, setAccessToken] = useState(null);
     const [refreshTimer, setRefreshTimer] = useState(null);
     const [folderIds, setFolderIds] = useState(null);
+    const [isSignedOut, setIsSignedOut] = useState(false);
     const showToast = useToast();
     const navigate = useNavigate();
 
     const driveApi = useMemo(() => {
-        return accessToken ? new GoogleDriveAPI(accessToken) : null;
-    }, [accessToken]);
+        return accessToken && !isSignedOut ? new GoogleDriveAPI(accessToken) : null;
+    }, [accessToken, isSignedOut]);
 
     const refreshToken = async () => {
+        if (isSignedOut) return; // Skip if signed out
         try {
             const { data: { session }, error: refreshError } = await supabase.auth.refreshSession();
             if (refreshError) throw refreshError;
@@ -29,6 +31,7 @@ export function GoogleDriveProvider({ children }) {
             }
             setAccessToken(session.provider_token);
             scheduleTokenRefresh(session);
+            console.log('Token refreshed successfully');
         } catch (err) {
             console.error('Token refresh failed:', err);
             setError(err);
@@ -36,6 +39,7 @@ export function GoogleDriveProvider({ children }) {
             localStorage.removeItem('notes_cache');
             localStorage.removeItem('notes_cache_timestamp');
             await supabase.auth.signOut();
+            setIsSignedOut(true);
             navigate('/login');
         }
     };
@@ -63,6 +67,7 @@ export function GoogleDriveProvider({ children }) {
                     return;
                 }
                 if (!session) {
+                    console.log('No active session');
                     setIsLoading(false);
                     return;
                 }
@@ -70,7 +75,7 @@ export function GoogleDriveProvider({ children }) {
                     console.error('No Google access token found');
                     setError(new Error('No Google access token found. Please sign in with Google.'));
                     setIsLoading(false);
-                    return; // Don’t sign out here; let user retry login
+                    return;
                 }
                 setAccessToken(session.provider_token);
                 scheduleTokenRefresh(session);
@@ -81,12 +86,12 @@ export function GoogleDriveProvider({ children }) {
             } catch (err) {
                 console.error('Failed to initialize Google Drive:', err);
                 setError(err);
-                // Only sign out if critical (e.g., folder structure fails), not for transient errors
                 if (err.message.includes('structure')) {
                     showToast('Failed to initialize Google Drive structure: ' + err.message, 'error');
                     localStorage.removeItem('notes_cache');
                     localStorage.removeItem('notes_cache_timestamp');
                     await supabase.auth.signOut();
+                    setIsSignedOut(true);
                     navigate('/login');
                 }
             } finally {
@@ -98,14 +103,20 @@ export function GoogleDriveProvider({ children }) {
 
     useEffect(() => {
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            console.log('Auth state changed:', _event);
             if (_event === 'SIGNED_OUT') {
                 setAccessToken(null);
                 setFolderIds(null);
+                setIsSignedOut(true);
                 if (refreshTimer) {
                     clearTimeout(refreshTimer);
                 }
             } else if (_event === 'TOKEN_REFRESHED' && session?.provider_token) {
                 setAccessToken(session.provider_token);
+                scheduleTokenRefresh(session);
+            } else if (_event === 'SIGNED_IN' && session?.provider_token) {
+                setAccessToken(session.provider_token);
+                setIsSignedOut(false);
                 scheduleTokenRefresh(session);
             }
         });
@@ -119,7 +130,8 @@ export function GoogleDriveProvider({ children }) {
         error,
         driveApi,
         folderIds,
-        refreshToken
+        refreshToken,
+        isSignedOut
     };
 
     return (

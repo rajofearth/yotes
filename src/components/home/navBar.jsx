@@ -1,6 +1,13 @@
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
-import { Plus, Settings, Search } from 'lucide-react';
+import { Plus, Settings, Search, FileText, FileImage, Upload } from 'lucide-react';
+import { 
+    DropdownMenu, 
+    DropdownMenuContent, 
+    DropdownMenuItem, 
+    DropdownMenuTrigger,
+    DropdownMenuSeparator
+} from "../ui/dropdown-menu";
 import { useNavigate } from 'react-router-dom';
 
 export default function NavBar({ onSearch }) {
@@ -18,19 +25,60 @@ export default function NavBar({ onSearch }) {
                                 type="text"
                                 placeholder="Search notes..."
                                 className="w-full lg:w-[300px] pl-9 h-10 bg-overlay/5 border-overlay/10 rounded-full text-sm"
-                                onChange={(e) => onSearch(e.target.value)}
+                                onChange={(e) => {
+                                    console.log('Search input changed:', e.target.value);
+                                    onSearch(e.target.value);
+                                }}
                             />
                         </div>
                     </div>
                     <div className="flex items-center gap-2 sm:gap-4">
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-10 w-10 rounded-full bg-overlay/5 hover:bg-overlay/10"
-                            onClick={() => navigate('/create')}
-                        >
-                            <Plus className="h-5 w-5 text-icon-primary" />
-                        </Button>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button 
+                                    variant="ghost" 
+                                    size="icon"
+                                    className="h-10 w-10 rounded-full bg-overlay/5 hover:bg-overlay/10 transition-colors group"
+                                >
+                                    <Plus className="h-5 w-5 text-icon-primary group-hover:text-white transition-colors" />
+                                    <span className="sr-only">Create new</span>
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent 
+                                align="end"
+                                className="w-[280px] sm:w-48 bg-bg-primary border border-overlay/10 shadow-lg"
+                            >
+                                <DropdownMenuItem 
+                                    className="flex items-center gap-2 text-text-primary hover:bg-overlay/10 cursor-pointer" 
+                                    onClick={() => navigate('/create')}
+                                >
+                                    <FileText className="h-4 w-4" />
+                                    <div className="flex flex-col">
+                                        <span className="text-sm">Note</span>
+                                        <span className="text-xs text-text-primary/60">Create a new note</span>
+                                    </div>
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator className="bg-overlay/10" />
+                                <DropdownMenuItem 
+                                    className="flex items-center gap-2 text-text-primary/40 opacity-50 cursor-not-allowed"
+                                >
+                                    <FileImage className="h-4 w-4" />
+                                    <div className="flex flex-col">
+                                        <span className="text-sm">Image Note</span>
+                                        <span className="text-xs text-text-primary/60">Create with image</span>
+                                    </div>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem 
+                                    className="flex items-center gap-2 text-text-primary/40 opacity-50 cursor-not-allowed"
+                                >
+                                    <Upload className="h-4 w-4" />
+                                    <div className="flex flex-col">
+                                        <span className="text-sm">Import</span>
+                                        <span className="text-xs text-text-primary/60">Import from file</span>
+                                    </div>
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
                         <Button
                             variant="ghost"
                             size="icon"

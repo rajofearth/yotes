@@ -8,6 +8,7 @@ import {
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuTrigger,
+    DropdownMenuSeparator
 } from '../ui/dropdown-menu';
 import { useNotes } from '../../hooks/useNotes';
 import { useToast } from '../../contexts/ToastContext';
@@ -61,21 +62,25 @@ export const NoteCard = ({ note, refreshNotes }) => {
                                 <span className="sr-only">Open menu</span>
                             </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-[200px]">
-                            <DropdownMenuItem
-                                className="text-text-primary hover:bg-overlay/10 cursor-pointer"
+                        <DropdownMenuContent 
+                            align="end" 
+                            className="w-[280px] sm:w-48 bg-bg-primary border border-overlay/10 shadow-lg"
+                        >
+                            <DropdownMenuItem 
+                                className="flex items-center gap-2 text-text-primary hover:bg-overlay/10 cursor-pointer"
                                 onClick={(e) => {
                                     e.stopPropagation();
                                     navigate(`/note/edit/${note.id}`);
                                 }}
                             >
-                                Edit
+                                <span>Edit</span>
                             </DropdownMenuItem>
-                            <DropdownMenuItem
-                                className="text-red-500 hover:bg-overlay/10 cursor-pointer"
+                            <DropdownMenuSeparator className="bg-overlay/10" />
+                            <DropdownMenuItem 
+                                className="flex items-center gap-2 text-red-500 hover:bg-overlay/10 cursor-pointer"
                                 onClick={handleDelete}
                             >
-                                Delete
+                                <span>Delete</span>
                             </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
@@ -89,7 +94,7 @@ export const NoteCard = ({ note, refreshNotes }) => {
                             const tag = tags.find(t => t.id === tagId);
                             return tag ? (
                                 <span
-                                    key={`${note.id}-tag-${tagId}-${index}`} // Unique key combining note ID, tag ID, and index
+                                    key={`${note.id}-tag-${tagId}-${index}`}
                                     className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-overlay/10 text-text-primary/80"
                                 >
                                     {tag.name}

@@ -4,25 +4,34 @@ import {
     DropdownMenuContent, 
     DropdownMenuItem, 
     DropdownMenuTrigger,
-    DropdownMenuCheckboxItem
+    DropdownMenuCheckboxItem,
+    DropdownMenuSeparator
 } from "../ui/dropdown-menu";
 import { Filter } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNotes } from '../../hooks/useNotes';
 
 export const TagFilters = ({ onFilterChange }) => {
     const { tags, createTag } = useNotes();
     const [selectedTags, setSelectedTags] = useState(['all']);
 
+    // Sync selectedTags with onFilterChange and default to 'all' if empty
+    useEffect(() => {
+        const finalTags = selectedTags.length === 0 ? ['all'] : selectedTags;
+        onFilterChange(finalTags);
+    }, [selectedTags, onFilterChange]);
+
     const handleCheckboxChange = (tagId) => {
         setSelectedTags(prev => {
-            if (tagId === 'all') return ['all'];
-            const newTags = prev.includes('all') ? [] : prev;
-            return newTags.includes(tagId) ? newTags.filter(t => t !== tagId) : [...newTags, tagId];
+            if (tagId === 'all') {
+                return ['all']; // Selecting "All" resets to just 'all'
+            }
+            const newTags = prev.includes('all') ? [] : prev; // Clear 'all' if another tag is selected
+            const updatedTags = newTags.includes(tagId) 
+                ? newTags.filter(t => t !== tagId) 
+                : [...newTags, tagId];
+            return updatedTags.length === 0 ? ['all'] : updatedTags; // Default to 'all' if no tags remain
         });
-        const newSelected = tagId === 'all' ? ['all'] : selectedTags.includes('all') ? [] : selectedTags;
-        const updatedTags = newSelected.includes(tagId) ? newSelected.filter(t => t !== tagId) : [...newSelected, tagId];
-        onFilterChange(updatedTags);
     };
 
     const handleManageTags = async () => {
@@ -73,6 +82,7 @@ export const TagFilters = ({ onFilterChange }) => {
                             {tag.name}
                         </DropdownMenuCheckboxItem>
                     ))}
+                    <DropdownMenuSeparator className="bg-overlay/10" />
                     <DropdownMenuItem onClick={handleManageTags}>
                         Manage tags...
                     </DropdownMenuItem>

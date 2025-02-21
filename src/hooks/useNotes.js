@@ -8,7 +8,7 @@ const TAGS_CACHE_KEY = 'tags_cache';
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 export function useNotes() {
-    const { driveApi, folderIds, isLoading: isDriveLoading } = useGoogleDrive();
+    const { driveApi, folderIds, isLoading: isDriveLoading, isSignedOut } = useGoogleDrive();
     const [notes, setNotes] = useState(() => {
         const cached = localStorage.getItem(CACHE_KEY);
         return cached ? JSON.parse(cached) : [];
@@ -27,10 +27,10 @@ export function useNotes() {
     }, []);
 
     const loadData = useCallback(async (force = false) => {
-        console.log('loadData called - Force:', force, 'Drive API:', !!driveApi, 'Folder IDs:', folderIds);
-        if (!driveApi || !folderIds?.notes || !folderIds?.tags) {
-            console.log('Missing driveApi or folderIds');
-            setError(new Error('Drive API not initialized'));
+        console.log('loadData called - Force:', force, 'Drive API:', !!driveApi, 'Folder IDs:', folderIds, 'Signed Out:', isSignedOut);
+        if (!driveApi || !folderIds?.notes || !folderIds?.tags || isSignedOut) {
+            console.log('Skipping loadData - Missing driveApi, folderIds, or signed out');
+            setError(isSignedOut ? null : new Error('Drive API not initialized'));
             setIsLoading(false);
             return;
         }
@@ -39,7 +39,6 @@ export function useNotes() {
         setError(null);
 
         try {
-            // Load tags
             if (force || shouldRefreshCache(TAGS_CACHE_KEY)) {
                 console.log('Fetching tags from Google Drive...');
                 let tagsResponse;
@@ -80,7 +79,6 @@ export function useNotes() {
                 localStorage.setItem(`${TAGS_CACHE_KEY}_timestamp`, Date.now().toString());
             }
 
-            // Load notes
             if (force || shouldRefreshCache(CACHE_KEY)) {
                 console.log('Fetching notes from Google Drive...');
                 let notesResponse;
@@ -132,17 +130,19 @@ export function useNotes() {
             console.log('Setting isLoading to false');
             setIsLoading(false);
         }
-    }, [driveApi, folderIds, shouldRefreshCache, showToast]);
+    }, [driveApi, folderIds, isSignedOut, shouldRefreshCache, showToast]);
 
     useEffect(() => {
-        console.log('useNotes effect - isDriveLoading:', isDriveLoading);
-        if (!isDriveLoading) {
+        console.log('useNotes effect - isDriveLoading:', isDriveLoading, 'Signed Out:', isSignedOut);
+        if (!isDriveLoading && !isSignedOut) {
             loadData();
+        } else if (isSignedOut) {
+            setIsLoading(false); // Reset loading state on sign-out
         }
-    }, [isDriveLoading, loadData]);
+    }, [isDriveLoading, isSignedOut, loadData]);
 
     const createNote = useCallback(async (noteData) => {
-        if (!driveApi || !folderIds?.notes) {
+        if (!driveApi || !folderIds?.notes || isSignedOut) {
             throw new Error('Drive API not initialized');
         }
         const note = {
@@ -166,10 +166,10 @@ export function useNotes() {
             showToast('Failed to create note', 'error');
             throw err;
         }
-    }, [driveApi, folderIds?.notes, notes, showToast]);
+    }, [driveApi, folderIds?.notes, notes, isSignedOut, showToast]);
 
     const updateNote = useCallback(async (noteId, updates) => {
-        if (!driveApi || !folderIds?.notes) {
+        if (!driveApi || !folderIds?.notes || isSignedOut) {
             throw new Error('Drive API not initialized');
         }
         try {
@@ -199,10 +199,10 @@ export function useNotes() {
             showToast('Failed to update note', 'error');
             throw err;
         }
-    }, [driveApi, folderIds?.notes, notes, showToast]);
+    }, [driveApi, folderIds?.notes, notes, isSignedOut, showToast]);
 
     const deleteNote = useCallback(async (noteId) => {
-        if (!driveApi || !folderIds?.notes) {
+        if (!driveApi || !folderIds?.notes || isSignedOut) {
             throw new Error('Drive API not initialized');
         }
         try {
@@ -219,10 +219,10 @@ export function useNotes() {
             showToast('Failed to delete note', 'error');
             throw err;
         }
-    }, [driveApi, folderIds?.notes, notes, showToast]);
+    }, [driveApi, folderIds?.notes, notes, isSignedOut, showToast]);
 
     const createTag = useCallback(async (tagData) => {
-        if (!driveApi || !folderIds?.tags) {
+        if (!driveApi || !folderIds?.tags || isSignedOut) {
             throw new Error('Drive API not initialized');
         }
         const newTag = { id: `tag-${Date.now()}`, name: tagData.name };
@@ -245,10 +245,10 @@ export function useNotes() {
             showToast('Failed to create tag', 'error');
             throw err;
         }
-    }, [driveApi, folderIds?.tags, tags, showToast]);
+    }, [driveApi, folderIds?.tags, tags, isSignedOut, showToast]);
 
     const updateTag = useCallback(async (tagId, updates) => {
-        if (!driveApi || !folderIds?.tags) {
+        if (!driveApi || !folderIds?.tags || isSignedOut) {
             throw new Error('Drive API not initialized');
         }
         const updatedTags = tags.map(t => t.id === tagId ? { ...t, ...updates } : t);
@@ -269,10 +269,10 @@ export function useNotes() {
             showToast('Failed to update tag', 'error');
             throw err;
         }
-    }, [driveApi, folderIds?.tags, tags, showToast]);
+    }, [driveApi, folderIds?.tags, tags, isSignedOut, showToast]);
 
     const deleteTag = useCallback(async (tagId) => {
-        if (!driveApi || !folderIds?.tags) {
+        if (!driveApi || !folderIds?.tags || isSignedOut) {
             throw new Error('Drive API not initialized');
         }
         const updatedTags = tags.filter(t => t.id !== tagId);
@@ -300,7 +300,9 @@ export function useNotes() {
             showToast('Failed to delete tag', 'error');
             throw err;
         }
-    }, [driveApi, folderIds?.tags, tags, notes, showToast]);
+    }, [driveApi, folderIds?.tags, tags, notes, isSignedOut, showToast]);
+
+    const refreshData = useCallback(() => loadData(true), [loadData]);
 
     return {
         notes,
@@ -313,6 +315,6 @@ export function useNotes() {
         createTag,
         updateTag,
         deleteTag,
-        refreshData: () => loadData(true)
+        refreshData
     };
 }
