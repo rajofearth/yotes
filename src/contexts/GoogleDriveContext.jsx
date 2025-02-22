@@ -49,7 +49,7 @@ export function GoogleDriveProvider({ children }) {
             clearTimeout(refreshTimer);
         }
         const REFRESH_MARGIN = 5 * 60 * 1000; // 5 minutes
-        const MAX_TOKEN_LIFETIME = 45 * 60 * 1000; // 45 minutes
+        const MAX_TOKEN_LIFETIME = 1440 * 60 * 1000; // 45 minutes
         const expiresIn = session.expires_in * 1000;
         const refreshTime = Math.min(expiresIn - REFRESH_MARGIN, MAX_TOKEN_LIFETIME);
         const timer = setTimeout(refreshToken, refreshTime);

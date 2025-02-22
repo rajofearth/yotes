@@ -48,11 +48,12 @@ export function useNotes() {
                     console.error('Failed to list tags files:', err);
                     throw new Error('Unable to list tags folder');
                 }
-                //console.log('Tags response:', tagsResponse);
+                
                 const tagsFile = tagsResponse.files.find(f => f.name === 'tags.json');
                 let tagsData = [];
+                
                 if (tagsFile) {
-                   // console.log('Downloading tags.json...');
+                    console.log('Downloading tags.json...');
                     let tagsBlob;
                     try {
                         tagsBlob = (await driveApi.downloadFiles([tagsFile.id]))[0];
@@ -63,23 +64,22 @@ export function useNotes() {
                     if (tagsBlob) {
                         try {
                             tagsData = JSON.parse(await tagsBlob.text());
-                           // console.log('Tags loaded:', tagsData);
+                            console.log('Tags loaded:', tagsData);
                         } catch (err) {
                             console.error('Failed to parse tags.json:', err);
                             throw new Error('Invalid tags.json format');
                         }
-                    } else {
-                       // console.log('tags.json blob is null');
-                        return
                     }
                 } else {
-                    //console.log('No tags.json found, using empty tags');
-                    return
+                    console.log('No tags.json found, using empty tags');
                 }
+                
+                // Update the state and cache regardless of tagsFile existence
                 setTags(tagsData);
                 localStorage.setItem(TAGS_CACHE_KEY, JSON.stringify(tagsData));
                 localStorage.setItem(`${TAGS_CACHE_KEY}_timestamp`, Date.now().toString());
             }
+
 
             if (force || shouldRefreshCache(CACHE_KEY)) {
                 console.log('Fetching notes from Google Drive...');

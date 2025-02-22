@@ -36,34 +36,44 @@ export default function Settings() {
         });
     }, [showToast]);
 
-    const handleDeleteAccount = async () => {
-        setIsLoadingDelete(true);
-        try {
-            await supabase.auth.signOut();
-            showToast('Account deletion requested. Contact support to complete.', 'success');
-            navigate('/login', { replace: true });
-        } catch (error) {
-            console.error('Delete account error:', error);
-            showToast('Failed to initiate account deletion', 'error');
-        } finally {
-            setIsLoadingDelete(false);
-            setIsDeleteDialogOpen(false);
-        }
+    const clearCache = () => {
+      localStorage.removeItem('notes_cache');
+      localStorage.removeItem('notes_cache_timestamp');
+      localStorage.removeItem('tags_cache');
+      localStorage.removeItem('tags_cache_timestamp'); // Assuming this key, or `${TAGS_CACHE_KEY}_timestamp`
     };
 
     const handleLogout = async () => {
-        setIsLoadingLogout(true);
-        try {
-            await supabase.auth.signOut();
-            showToast('Logged out successfully', 'success');
-            navigate('/login', { replace: true });
-        } catch (error) {
-            console.error('Logout error:', error);
-            showToast('Failed to log out', 'error');
-        } finally {
-            setIsLoadingLogout(false);
-        }
+      setIsLoadingLogout(true);
+      try {
+        await supabase.auth.signOut();
+        clearCache(); // Clear cache on logout
+        showToast('Logged out successfully', 'success');
+        navigate('/login', { replace: true });
+      } catch (error) {
+        console.error('Logout error:', error);
+        showToast('Failed to log out', 'error');
+      } finally {
+        setIsLoadingLogout(false);
+      }
     };
+
+    const handleDeleteAccount = async () => {
+      setIsLoadingDelete(true);
+      try {
+        await supabase.auth.signOut();
+        clearCache(); // Clear cache on account deletion
+        showToast('Account deletion requested. Contact support to complete.', 'success');
+        navigate('/login', { replace: true });
+      } catch (error) {
+        console.error('Delete account error:', error);
+        showToast('Failed to initiate account deletion', 'error');
+      } finally {
+        setIsLoadingDelete(false);
+        setIsDeleteDialogOpen(false);
+      }
+    };
+
 
     const startEditingTag = (tag) => {
         setEditingTagId(tag.id);
@@ -312,7 +322,7 @@ export default function Settings() {
                             variant="destructive" 
                             onClick={() => setIsDeleteDialogOpen(true)}
                             disabled={isLoadingLogout || isLoadingDelete}
-                            className="w-full flex items-center justify-center gap-2"
+                            className="w-full flex items-center justify-center gap-2 bg-red-500 text-white hover:scale-105 hover:text-white"
                         >
                             <Trash2 className="h-4 w-4" />
                             {isLoadingDelete ? 'Processing...' : 'Delete Account'}
@@ -330,22 +340,23 @@ export default function Settings() {
                             Are you sure you want to delete your account? This action cannot be undone.
                         </DialogDescription>
                     </DialogHeader>
-                    <DialogFooter>
-                        <Button 
-                            variant="outline" 
-                            onClick={() => setIsDeleteDialogOpen(false)}
-                            className="bg-overlay/5 hover:bg-overlay/10"
-                        >
-                            Cancel
-                        </Button>
-                        <Button 
-                            variant="destructive" 
-                            onClick={handleDeleteAccount}
-                            disabled={isLoadingDelete}
-                        >
-                            {isLoadingDelete ? 'Deleting...' : 'Delete'}
-                        </Button>
-                    </DialogFooter>
+                <DialogFooter className="flex flex-col sm:flex-row justify-end gap-4">
+                    <Button 
+                        variant="outline" 
+                        onClick={() => setIsDeleteDialogOpen(false)}
+                        className="bg-overlay/5 hover:bg-overlay/10 w-full sm:w-32"
+                    >
+                        Cancel
+                    </Button>
+                    <Button 
+                        variant="destructive" 
+                        className="bg-red-500 text-white w-full sm:w-32"
+                        onClick={handleDeleteAccount}
+                        disabled={isLoadingDelete}
+                    >
+                        {isLoadingDelete ? 'Deleting...' : 'Delete'}
+                    </Button>
+                </DialogFooter>
                 </DialogContent>
             </Dialog>
 
