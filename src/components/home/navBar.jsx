@@ -46,7 +46,7 @@ export default function NavBar({ onSearch }) {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent 
                                 align="end"
-                                className="w-[280px] sm:w-48 bg-bg-primary border border-overlay/10 shadow-lg"
+                                className="w-fit sm:w-48 bg-bg-primary border border-overlay/10 shadow-lg"
                             >
                                 <DropdownMenuItem 
                                     className="flex items-center gap-2 text-text-primary hover:bg-overlay/10 cursor-pointer" 
@@ -68,6 +68,7 @@ export default function NavBar({ onSearch }) {
                                         <span className="text-xs text-text-primary/60">Create with image</span>
                                     </div>
                                 </DropdownMenuItem>
+                                <DropdownMenuSeparator className="bg-overlay/10" />
                                 <DropdownMenuItem 
                                     className="flex items-center gap-2 text-text-primary/40 opacity-50 cursor-not-allowed"
                                 >

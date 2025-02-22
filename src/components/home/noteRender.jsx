@@ -64,7 +64,7 @@ export const NoteCard = ({ note, refreshNotes }) => {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent 
                             align="end" 
-                            className="w-[280px] sm:w-48 bg-bg-primary border border-overlay/10 shadow-lg"
+                            className="w-fit sm:w-48 bg-bg-primary border border-overlay/10 shadow-lg"
                         >
                             <DropdownMenuItem 
                                 className="flex items-center gap-2 text-text-primary hover:bg-overlay/10 cursor-pointer"
