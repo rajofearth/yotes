@@ -8,7 +8,7 @@ import { Badge } from '../../../components/ui/badge';
 export default function ViewNote() {
     const { id } = useParams();
     const navigate = useNavigate();
-    const { notes } = useNotes();
+    const { notes, tags } = useNotes(); // Fetching tags from useNotes
     const [note, setNote] = useState(null);
 
     useEffect(() => {
@@ -53,11 +53,14 @@ export default function ViewNote() {
                     )}
                     {note.tags?.length > 0 && (
                         <div className="flex flex-wrap gap-2">
-                            {note.tags.map((tag, index) => (
-                                <Badge key={index} variant="secondary">
-                                    {tag.name}
-                                </Badge>
-                            ))}
+                            {note.tags.map((tagId, index) => {
+                                const tag = tags.find(t => t.id === tagId);
+                                return tag ? (
+                                    <Badge key={`${note.id}-tag-${tagId}-${index}`} variant="secondary">
+                                        {tag.name}
+                                    </Badge>
+                                ) : null;
+                            })}
                         </div>
                     )}
                 </div>
