@@ -1,11 +1,12 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react'; // UPDATED: Import useRef
 import { useGoogleDrive } from '../contexts/GoogleDriveContext';
 import { useToast } from '../contexts/ToastContext';
 
 const CACHE_KEY = 'notes_cache';
 const CACHE_TIMESTAMP_KEY = 'notes_cache_timestamp';
 const TAGS_CACHE_KEY = 'tags_cache';
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+const TAGS_CACHE_TIMESTAMP_KEY = 'tags_cache_timestamp'; // UPDATED: Added timestamp key for tags
+const CACHE_DURATION = 15 * 60 * 1000; // Increased cache duration to 15 minutes
 
 export function useNotes() {
     const { driveApi, folderIds, isLoading: isDriveLoading, isSignedOut } = useGoogleDrive();
@@ -19,7 +20,9 @@ export function useNotes() {
     });
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [loadingProgress, setLoadingProgress] = useState(0); // UPDATED: Progress state
     const showToast = useToast();
+    const loadCounter = useRef(0);
 
     const shouldRefreshCache = useCallback((key) => {
         const timestamp = localStorage.getItem(`${key}_timestamp`);
@@ -27,36 +30,58 @@ export function useNotes() {
     }, []);
 
     const loadData = useCallback(async (force = false) => {
-        //console.log('loadData called - Force:', force, 'Drive API:', !!driveApi, 'Folder IDs:', folderIds, 'Signed Out:', isSignedOut);
+        loadCounter.current += 1;
+        const thisLoadCount = loadCounter.current;
+        if (!force && !shouldRefreshCache(CACHE_KEY) && !shouldRefreshCache(TAGS_CACHE_KEY)) {
+            console.log('Using cached data');
+            setIsLoading(false);
+            setLoadingProgress(100); // UPDATED: Set progress to 100%
+            return;
+        }
+
         if (!driveApi || !folderIds?.notes || !folderIds?.tags || isSignedOut) {
-           // console.log('Skipping loadData - Missing driveApi, folderIds, or signed out');
             setError(isSignedOut ? null : new Error('Drive API not initialized'));
             setIsLoading(false);
+            setLoadingProgress(0); // UPDATED: Reset progress
             return;
         }
 
         setIsLoading(true);
         setError(null);
+        setLoadingProgress(0); // UPDATED: Reset progress
 
         try {
+            let tagsData = [];
+            let notesData = [];
+            let tagsResponse, notesResponse;
+            let tagsFile, notesBlobs;
+
+            // Function to update progress
+            const updateProgress = (value) => {
+                if (thisLoadCount === loadCounter.current){
+                    setLoadingProgress(value);
+                }
+            };
+
+            // Fetch Tags
             if (force || shouldRefreshCache(TAGS_CACHE_KEY)) {
                 console.log('Fetching tags from Google Drive...');
-                let tagsResponse;
                 try {
                     tagsResponse = await driveApi.listFiles(folderIds.tags);
+                    updateProgress(10);
                 } catch (err) {
                     console.error('Failed to list tags files:', err);
                     throw new Error('Unable to list tags folder');
                 }
-                
-                const tagsFile = tagsResponse.files.find(f => f.name === 'tags.json');
-                let tagsData = [];
-                
+
+                tagsFile = tagsResponse.files.find(f => f.name === 'tags.json');
+
                 if (tagsFile) {
                     console.log('Downloading tags.json...');
                     let tagsBlob;
                     try {
                         tagsBlob = (await driveApi.downloadFiles([tagsFile.id]))[0];
+                        updateProgress(20);
                     } catch (err) {
                         console.error('Failed to download tags.json:', err);
                         throw new Error('Unable to download tags.json');
@@ -65,6 +90,7 @@ export function useNotes() {
                         try {
                             tagsData = JSON.parse(await tagsBlob.text());
                             console.log('Tags loaded:', tagsData);
+                            updateProgress(30);
                         } catch (err) {
                             console.error('Failed to parse tags.json:', err);
                             throw new Error('Invalid tags.json format');
@@ -73,35 +99,37 @@ export function useNotes() {
                 } else {
                     console.log('No tags.json found, using empty tags');
                 }
-                
-                // Update the state and cache regardless of tagsFile existence
                 setTags(tagsData);
                 localStorage.setItem(TAGS_CACHE_KEY, JSON.stringify(tagsData));
-                localStorage.setItem(`${TAGS_CACHE_KEY}_timestamp`, Date.now().toString());
+                localStorage.setItem(TAGS_CACHE_TIMESTAMP_KEY, Date.now().toString()); // UPDATED: Using the correct timestamp key
+
+            } else {
+                tagsData = JSON.parse(localStorage.getItem(TAGS_CACHE_KEY) || '[]');
+                setTags(tagsData);
+                updateProgress(30);
             }
 
-
+            // Fetch Notes
             if (force || shouldRefreshCache(CACHE_KEY)) {
                 console.log('Fetching notes from Google Drive...');
-                let notesResponse;
+
                 try {
                     notesResponse = await driveApi.listFiles(folderIds.notes);
+                    updateProgress(40);
                 } catch (err) {
                     console.error('Failed to list notes files:', err);
                     throw new Error('Unable to list notes folder');
                 }
-                //console.log('Notes response:', notesResponse);
-                let notesData = [];
+
                 if (notesResponse.files.length > 0) {
-                    //console.log('Downloading notes...');
-                    let notesBlobs;
                     try {
                         notesBlobs = await driveApi.downloadFiles(notesResponse.files.map(f => f.id));
+                        updateProgress(60);
                     } catch (err) {
                         console.error('Failed to download notes:', err);
                         throw new Error('Unable to download notes');
                     }
-                    //console.log('Notes blobs:', notesBlobs.length);
+
                     notesData = await Promise.all(
                         notesBlobs.filter(Boolean).map(async (blob, index) => {
                             try {
@@ -112,34 +140,49 @@ export function useNotes() {
                             }
                         })
                     );
-                    //console.log('Raw notes data:', notesData);
+                    updateProgress(80);
+
                 } else {
                     console.log('No notes found in folder');
                 }
+
                 const validNotes = notesData
                     .filter(note => note && note.id && note.createdAt && note.updatedAt)
                     .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
-                //console.log('Valid notes:', validNotes);
+
                 setNotes(validNotes);
                 localStorage.setItem(CACHE_KEY, JSON.stringify(validNotes));
                 localStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString());
+                updateProgress(90);
+
+            } else {
+                notesData = JSON.parse(localStorage.getItem(CACHE_KEY) || '[]');
+                setNotes(notesData);
+                updateProgress(90);
             }
+
+            updateProgress(100); // All data loaded
+
         } catch (err) {
             console.error('Error in loadData:', err);
             setError(err);
             showToast('Failed to load data: ' + err.message, 'error');
+            setLoadingProgress(0);
+
         } finally {
-           // console.log('Setting isLoading to false');
             setIsLoading(false);
+            if (thisLoadCount === loadCounter.current){
+                setLoadingProgress(100);
+            }
         }
     }, [driveApi, folderIds, isSignedOut, shouldRefreshCache, showToast]);
 
     useEffect(() => {
-        //console.log('useNotes effect - isDriveLoading:', isDriveLoading, 'Signed Out:', isSignedOut);
         if (!isDriveLoading && !isSignedOut) {
             loadData();
         } else if (isSignedOut) {
-            setIsLoading(false); // Reset loading state on sign-out
+            setIsLoading(false);
+            setLoadingProgress(0); // UPDATED: Reset progress
         }
     }, [isDriveLoading, isSignedOut, loadData]);
 
@@ -317,6 +360,7 @@ export function useNotes() {
         createTag,
         updateTag,
         deleteTag,
-        refreshData
+        refreshData,
+        loadingProgress // UPDATED: Expose loadingProgress
     };
 }

@@ -18,6 +18,8 @@ export default function Settings() {
     const [user, setUser] = useState(null);
     const [isLoadingLogout, setIsLoadingLogout] = useState(false);
     const [isLoadingDelete, setIsLoadingDelete] = useState(false);
+    const [isLoadingTagDelete, setIsLoadingTagDelete] = useState(false);
+    const [isTagCreate, setIsTagCreate] = useState(false);
     const [editingTagId, setEditingTagId] = useState(null);
     const [editingTagName, setEditingTagName] = useState('');
     const [newTagName, setNewTagName] = useState('');
@@ -97,12 +99,14 @@ export default function Settings() {
 
     const deleteTagHandler = async () => {
         if (!tagToDelete) return;
+        setIsLoadingTagDelete(true);
         try {
             await deleteTag(tagToDelete);
             showToast('Tag deleted successfully', 'success');
         } catch (error) {
             showToast('Failed to delete tag', 'error');
         } finally {
+            setIsLoadingTagDelete(false);
             setIsDeleteTagDialogOpen(false);
             setTagToDelete(null);
         }
@@ -119,12 +123,15 @@ export default function Settings() {
             return;
         }
         try {
+            setIsTagCreate(true);
             await createTag({ name: newTagName });
             showToast('Tag created successfully', 'success');
             setNewTagName('');
         } catch (error) {
             showToast('Failed to create tag', 'error');
-        }
+        } finally {
+            setIsTagCreate(false);
+      }
     };
 
     // Calculate note activity for the past year (365 days)
@@ -214,9 +221,12 @@ export default function Settings() {
             onChange={(e) => setNewTagName(e.target.value)}
             className="flex-1 bg-overlay/5 border-overlay/10"
           />
-          <Button onClick={createNewTag} className="flex items-center gap-2 bg-overlay/10 hover:bg-overlay/20">
+          <Button 
+          onClick={createNewTag} 
+          className="flex items-center gap-2 bg-overlay/10 hover:bg-overlay/20"
+          disabled={isTagCreate}>
             <Plus className="h-4 w-4" />
-            Add Tag
+          { isTagCreate ? 'Adding...' : 'Add Tag'}
           </Button>
         </div>
         {tags.length > 0 ? (
@@ -420,8 +430,10 @@ export default function Settings() {
         >
           Cancel
         </Button>
-        <Button variant="destructive" onClick={deleteTagHandler}>
-          Delete
+        <Button variant="destructive" 
+        onClick={deleteTagHandler}
+        disabled={isLoadingTagDelete}>
+          {isLoadingTagDelete ? 'Deleting...' : 'Delete'}
         </Button>
       </DialogFooter>
     </DialogContent>

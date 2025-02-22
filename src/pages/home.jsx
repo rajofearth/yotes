@@ -6,6 +6,7 @@ import NavBar from '../components/home/navBar';
 import { useNotes } from '../hooks/useNotes';
 import { useGoogleDrive } from '../contexts/GoogleDriveContext';
 import { useLocation } from 'react-router-dom';
+import { Progress } from '../components/ui/progress'; // UPDATED: Import Progress component
 
 // Simple debounce function
 const debounce = (func, delay) => {
@@ -19,14 +20,13 @@ const debounce = (func, delay) => {
 export default function Home() {
     const { isLoading: isDriveLoading } = useGoogleDrive();
     const location = useLocation();
-    const { notes, tags, isLoading: isNotesLoading, error, refreshData } = useNotes();
+    const { notes, tags, isLoading: isNotesLoading, error, refreshData, loadingProgress } = useNotes(); // UPDATED: Get loadingProgress
     const [filteredNotes, setFilteredNotes] = useState([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedTagIds, setSelectedTagIds] = useState(['all']);
 
     // Centralized filtering logic
     const applyFiltersAndSearch = useCallback((notesList, query, tagIds) => {
-        //console.log('Applying filters - Notes:', notesList.length, 'Query:', query, 'Tag IDs:', tagIds);
         let filtered = [...notesList];
 
         // Apply tag filter
@@ -45,16 +45,12 @@ export default function Home() {
                  note.content?.toLowerCase().includes(lowerQuery))
             );
         }
-
-        //console.log('Filtered notes result:', filtered.length);
         setFilteredNotes(filtered);
     }, []);
 
     // Initialize and handle refresh
     useEffect(() => {
-        //console.log('useEffect - Notes:', notes.length, 'Query:', searchQuery, 'Tags:', selectedTagIds);
         if (location.state?.refresh) {
-            //console.log('Refreshing data due to location state');
             refreshData();
         }
         applyFiltersAndSearch(notes, searchQuery, selectedTagIds);
@@ -63,7 +59,6 @@ export default function Home() {
     // Debounced search handler
     const handleSearch = useCallback(
         debounce((query) => {
-            //console.log('handleSearch triggered - Query:', query);
             setSearchQuery(query);
         }, 300),
         []
@@ -71,8 +66,6 @@ export default function Home() {
 
     // Handle tag filtering
     const handleFilterChange = (tagIds) => {
-        //console.log('handleFilterChange - Selected tag IDs:', tagIds);
-        // Default to 'all' if no tags are selected
         const finalTagIds = tagIds.length === 0 ? ['all'] : tagIds;
         setSelectedTagIds(finalTagIds);
     };
@@ -81,8 +74,9 @@ export default function Home() {
 
     if (isDriveLoading || isNotesLoading) {
         return (
-            <div className="min-h-screen bg-bg-primary flex items-center justify-center">
-                <div className="text-text-primary">Loading your notes...</div>
+            <div className="min-h-screen bg-bg-primary flex flex-col items-center justify-center">
+                <div className="text-text-primary mb-4">Loading your notes...</div>
+                <Progress value={loadingProgress} className="w-64" /> {/* UPDATED: Show progress bar */}
             </div>
         );
     }

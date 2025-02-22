@@ -49,8 +49,11 @@ export function GoogleDriveProvider({ children }) {
             clearTimeout(refreshTimer);
         }
         const REFRESH_MARGIN = 5 * 60 * 1000; // 5 minutes
-        const MAX_TOKEN_LIFETIME = 1440 * 60 * 1000; // 45 minutes
-        const expiresIn = session.expires_in * 1000;
+        const MAX_TOKEN_LIFETIME = 45 * 60 * 1000; // 45 minutes
+
+        //DEBUG
+        const expiresIn = MAX_TOKEN_LIFETIME //session.expires_in * 1000;
+
         const refreshTime = Math.min(expiresIn - REFRESH_MARGIN, MAX_TOKEN_LIFETIME);
         const timer = setTimeout(refreshToken, refreshTime);
         setRefreshTimer(timer);
@@ -74,6 +77,11 @@ export function GoogleDriveProvider({ children }) {
                 if (!session.provider_token) {
                     console.error('No Google access token found');
                     setError(new Error('No Google access token found. Please sign in with Google.'));
+                    localStorage.removeItem('notes_cache');
+                    localStorage.removeItem('notes_cache_timestamp');
+                    await supabase.auth.signOut();
+                    setIsSignedOut(true);
+                    navigate('/login');
                     setIsLoading(false);
                     return;
                 }
@@ -82,9 +90,7 @@ export function GoogleDriveProvider({ children }) {
                 const structureManager = new DriveStructureManager(new GoogleDriveAPI(session.provider_token));
                 const folders = await structureManager.initializeStructure();
                 setFolderIds(folders);
-               // console.log('Google Drive initialized - Folder IDs:', folders);
             } catch (err) {
-                //console.error('Failed to initialize Google Drive:', err);
                 setError(err);
                 if (err.message.includes('structure')) {
                     showToast('Failed to initialize Google Drive structure: ' + err.message, 'error');
@@ -103,7 +109,6 @@ export function GoogleDriveProvider({ children }) {
 
     useEffect(() => {
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-            //console.log('Auth state changed:', _event);
             if (_event === 'SIGNED_OUT') {
                 setAccessToken(null);
                 setFolderIds(null);
@@ -126,7 +131,7 @@ export function GoogleDriveProvider({ children }) {
     }, [refreshTimer]);
 
     const value = {
-        isLoading: isLoading || !folderIds,
+        isLoading: isLoading, // UPDATED: Removed folderIds dependency
         error,
         driveApi,
         folderIds,
