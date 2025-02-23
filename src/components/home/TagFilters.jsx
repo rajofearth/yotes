@@ -67,7 +67,7 @@ export const TagFilters = ({ onFilterChange }) => {
                         <Filter className="h-4 w-4" />
                     </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56 bg-bg-primary border border-overlay/10 shadow-lg">
+                <DropdownMenuContent align="end" className="w-fit bg-bg-primary border border-overlay/10 shadow-lg">
                     <DropdownMenuCheckboxItem
                         checked={selectedTags.includes('all')}
                         onCheckedChange={() => handleCheckboxChange('all')}

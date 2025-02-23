@@ -22,39 +22,76 @@ export function GoogleDriveProvider({ children }) {
     }, [accessToken, isSignedOut]);
 
     const refreshToken = async () => {
-        if (isSignedOut) return; // Skip if signed out
+        if (isSignedOut) return;
         try {
-            const { data: { session }, error: refreshError } = await supabase.auth.refreshSession();
-            if (refreshError) throw refreshError;
-            if (!session?.provider_token) {
-                throw new Error('Failed to refresh Google access token');
+            console.log('Refreshing session and Google provider token...');
+            // First, ensure Supabase session is valid
+            const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+            if (sessionError || !session) {
+                console.log('No valid session, attempting refresh...');
+                const { error: refreshError } = await supabase.auth.refreshSession();
+                if (refreshError) throw refreshError;
+
+                // Re-fetch session after refresh
+                const { data: { session: refreshedSession }, error: newError } = await supabase.auth.getSession();
+                if (newError || !refreshedSession) throw new Error('Failed to refresh Supabase session');
+                session = refreshedSession;
             }
+
+            if (!session.provider_token) {
+                console.log('Google provider token missing, attempting re-auth...');
+                throw new Error('Google access token unavailable');
+            }
+
             setAccessToken(session.provider_token);
             scheduleTokenRefresh(session);
-            console.log('Token refreshed successfully');
+            console.log('Session and token refreshed successfully');
         } catch (err) {
-            console.error('Token refresh failed:', err);
+            console.error('Refresh failed:', err);
             setError(err);
-            showToast('Failed to refresh Google Drive access. Please sign in again.', 'error');
-            localStorage.removeItem('notes_cache');
-            localStorage.removeItem('notes_cache_timestamp');
-            await supabase.auth.signOut();
+            showToast('Google Drive access issue detected. Attempting to reconnect...', 'warning');
+            await attemptSilentReauth();
+        }
+    };
+
+    const attemptSilentReauth = async () => {
+        try {
+            console.log('Attempting silent Google re-authentication...');
+            const { data, error } = await supabase.auth.signInWithOAuth({
+                provider: 'google',
+                options: {
+                    redirectTo: `${window.location.origin}/auth/callback`,
+                    scopes: 'https://www.googleapis.com/auth/drive.file',
+                    queryParams: {
+                        access_type: 'offline',
+                        prompt: 'none', // Silent refresh attempt
+                        include_granted_scopes: 'true'
+                    }
+                }
+            });
+            if (error) throw error;
+            if (data?.session?.provider_token) {
+                setAccessToken(data.session.provider_token);
+                scheduleTokenRefresh(data.session);
+                setError(null);
+                showToast('Google Drive reconnected successfully', 'success');
+            }
+        } catch (err) {
+            console.error('Silent re-auth failed:', err);
+            showToast('Please sign in again to restore Google Drive access.', 'error');
             setIsSignedOut(true);
             navigate('/login');
         }
     };
 
     const scheduleTokenRefresh = (session) => {
-        if (refreshTimer) {
-            clearTimeout(refreshTimer);
-        }
+        if (refreshTimer) clearTimeout(refreshTimer);
+
         const REFRESH_MARGIN = 5 * 60 * 1000; // 5 minutes
-        const MAX_TOKEN_LIFETIME = 45 * 60 * 1000; // 45 minutes
-
-        //DEBUG
-        const expiresIn = MAX_TOKEN_LIFETIME //session.expires_in * 1000;
-
-        const refreshTime = Math.min(expiresIn - REFRESH_MARGIN, MAX_TOKEN_LIFETIME);
+        // Use expires_in from session, fallback to 55 minutes for Google tokens
+        const expiresIn = (session.expires_in ? session.expires_in * 1000 : 55 * 60 * 1000);
+        const refreshTime = expiresIn - REFRESH_MARGIN;
+        console.log(`Scheduling token refresh in ${refreshTime / 1000 / 60} minutes`);
         const timer = setTimeout(refreshToken, refreshTime);
         setRefreshTimer(timer);
     };
@@ -63,26 +100,18 @@ export function GoogleDriveProvider({ children }) {
         async function initializeGoogleDrive() {
             try {
                 const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-                if (sessionError) {
-                    console.error('Session error:', sessionError);
-                    setError(sessionError);
-                    setIsLoading(false);
-                    return;
-                }
+                if (sessionError) throw sessionError;
                 if (!session) {
                     console.log('No active session');
+                    setIsSignedOut(true);
+                    navigate('/login');
                     setIsLoading(false);
                     return;
                 }
                 if (!session.provider_token) {
                     console.error('No Google access token found');
-                    setError(new Error('No Google access token found. Please sign in with Google.'));
-                    localStorage.removeItem('notes_cache');
-                    localStorage.removeItem('notes_cache_timestamp');
-                    await supabase.auth.signOut();
-                    setIsSignedOut(true);
-                    navigate('/login');
-                    setIsLoading(false);
+                    setError(new Error('No Google access token found'));
+                    await attemptSilentReauth();
                     return;
                 }
                 setAccessToken(session.provider_token);
@@ -91,15 +120,10 @@ export function GoogleDriveProvider({ children }) {
                 const folders = await structureManager.initializeStructure();
                 setFolderIds(folders);
             } catch (err) {
+                console.error('Initialization error:', err);
                 setError(err);
-                if (err.message.includes('structure')) {
-                    showToast('Failed to initialize Google Drive structure: ' + err.message, 'error');
-                    localStorage.removeItem('notes_cache');
-                    localStorage.removeItem('notes_cache_timestamp');
-                    await supabase.auth.signOut();
-                    setIsSignedOut(true);
-                    navigate('/login');
-                }
+                showToast('Failed to initialize Google Drive: ' + err.message, 'error');
+                navigate('/login');
             } finally {
                 setIsLoading(false);
             }
@@ -109,13 +133,13 @@ export function GoogleDriveProvider({ children }) {
 
     useEffect(() => {
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            console.log('Auth state changed:', _event);
             if (_event === 'SIGNED_OUT') {
                 setAccessToken(null);
                 setFolderIds(null);
                 setIsSignedOut(true);
-                if (refreshTimer) {
-                    clearTimeout(refreshTimer);
-                }
+                if (refreshTimer) clearTimeout(refreshTimer);
+                navigate('/login');
             } else if (_event === 'TOKEN_REFRESHED' && session?.provider_token) {
                 setAccessToken(session.provider_token);
                 scheduleTokenRefresh(session);
@@ -123,15 +147,14 @@ export function GoogleDriveProvider({ children }) {
                 setAccessToken(session.provider_token);
                 setIsSignedOut(false);
                 scheduleTokenRefresh(session);
+                setIsLoading(false);
             }
         });
-        return () => {
-            subscription.unsubscribe();
-        };
-    }, [refreshTimer]);
+        return () => subscription.unsubscribe();
+    }, [refreshTimer, navigate]);
 
     const value = {
-        isLoading: isLoading, // UPDATED: Removed folderIds dependency
+        isLoading,
         error,
         driveApi,
         folderIds,
