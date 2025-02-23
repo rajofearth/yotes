@@ -89,7 +89,7 @@ export function useNotes() {
                     if (tagsBlob) {
                         try {
                             tagsData = JSON.parse(await tagsBlob.text());
-                            console.log('Tags loaded:', tagsData);
+                            //console.log('Tags loaded:', tagsData);
                             updateProgress(30);
                         } catch (err) {
                             console.error('Failed to parse tags.json:', err);

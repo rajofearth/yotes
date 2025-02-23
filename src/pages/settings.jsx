@@ -46,19 +46,22 @@ export default function Settings() {
     };
 
     const handleLogout = async () => {
-      setIsLoadingLogout(true);
-      try {
-        await supabase.auth.signOut();
-        clearCache(); // Clear cache on logout
-        showToast('Logged out successfully', 'success');
-        navigate('/login', { replace: true });
-      } catch (error) {
-        console.error('Logout error:', error);
-        showToast('Failed to log out', 'error');
-      } finally {
-        setIsLoadingLogout(false);
-      }
-    };
+        setIsLoadingLogout(true);
+        try {
+          const { error } = await supabase.auth.signOut();
+          if (error) throw error;
+          localStorage.clear(); // Wipe everything
+          sessionStorage.clear(); // Clear session storage too, just in case
+          console.log('Logged out and cleared all storage');
+          showToast('Logged out successfully', 'success');
+          navigate('/login', { replace: true });
+        } catch (error) {
+          console.error('Logout error:', error);
+          showToast('Failed to log out', 'error');
+        } finally {
+          setIsLoadingLogout(false);
+        }
+      };
 
     const handleDeleteAccount = async () => {
       setIsLoadingDelete(true);
