@@ -1,20 +1,9 @@
 export const groupNotesByDate = (notes = []) => {
-    const groups = {
-        Today: [],
-        Yesterday: [],
-        Earlier: {}
-    };
-
-    if (!notes || notes.length === 0) {
-        return groups;
-    }
-
     const today = new Date().toLocaleDateString();
     const yesterday = new Date(Date.now() - 86400000).toLocaleDateString();
 
-    notes.forEach(note => {
-        if (!note.createdAt) return; // Skip if no date
-
+    return notes.reduce((groups, note) => {
+        if (!note?.createdAt) return groups;
         const noteDate = new Date(note.createdAt).toLocaleDateString();
 
         if (noteDate === today) {
@@ -22,12 +11,9 @@ export const groupNotesByDate = (notes = []) => {
         } else if (noteDate === yesterday) {
             groups.Yesterday.push(note);
         } else {
-            if (!groups.Earlier[noteDate]) {
-                groups.Earlier[noteDate] = [];
-            }
+            groups.Earlier[noteDate] = groups.Earlier[noteDate] || [];
             groups.Earlier[noteDate].push(note);
         }
-    });
-
-    return groups;
-}; 
+        return groups;
+    }, { Today: [], Yesterday: [], Earlier: {} });
+};

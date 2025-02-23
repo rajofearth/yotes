@@ -36,7 +36,7 @@ export const NotesSection = ({ title, notes = [], sectionKey, refreshNotes }) =>
     if (!notes.length) return null;
 
     return (
-        <section className="space-y-4 overflow-hidden">
+        <section className="space-y-2 overflow-hidden">
             <div className="flex justify-between items-center">
                 <div className="flex items-baseline gap-2">
                     <h2 className="text-xl font-semibold tracking-tight">{title}</h2>
@@ -57,7 +57,7 @@ export const NotesSection = ({ title, notes = [], sectionKey, refreshNotes }) =>
                     className="flex gap-4 overflow-x-auto overflow-y-hidden overscroll-x-contain pb-4 snap-x scrollbar-hide"
                 >
                     {notes.map(note => (
-                        <div key={note.id} className="flex-none w-[300px] snap-start">
+                        <div key={note.id} className="flex-none w-[280px] snap-start">
                             <NoteCard note={note} refreshNotes={refreshNotes} />
                         </div>
                     ))}

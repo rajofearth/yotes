@@ -26,6 +26,7 @@ export default function Settings() {
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [isDeleteTagDialogOpen, setIsDeleteTagDialogOpen] = useState(false);
     const [tagToDelete, setTagToDelete] = useState(null);
+    const [isTagCreateDialogOpen, setIsTagCreateDialogOpen] = useState(false);
 
     useEffect(() => {
         supabase.auth.getUser().then(({ data, error }) => {
@@ -211,77 +212,69 @@ export default function Settings() {
         </p>
       </CardContent>
     </Card>
-    <Card className="bg-overlay/5 border-overlay/10">
-      <CardHeader>
-        <CardTitle>Tag Management</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="flex items-center gap-2">
-          <Input
-            type="text"
-            placeholder="New tag name"
-            value={newTagName}
-            onChange={(e) => setNewTagName(e.target.value)}
-            className="flex-1 bg-overlay/5 border-overlay/10"
-          />
-          <Button 
-          onClick={createNewTag} 
-          className="flex items-center gap-2 bg-overlay/10 hover:bg-overlay/20"
-          disabled={isTagCreate}>
-            <Plus className="h-4 w-4" />
-          { isTagCreate ? 'Adding...' : 'Add Tag'}
-          </Button>
-        </div>
-        {tags.length > 0 ? (
-          <div className="space-y-2">
-            {tags.map((tag) => (
-              <div key={tag.id} className="flex items-center gap-2">
-                {editingTagId === tag.id ? (
-                  <>
-                    <Input
-                      type="text"
-                      value={editingTagName}
-                      onChange={(e) => setEditingTagName(e.target.value)}
-                      className="flex-1 bg-overlay/5 border-overlay/10"
-                    />
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={() => saveTagEdit(tag.id)}
-                      className="bg-overlay/5 hover:bg-overlay/10"
-                    >
-                      <Save className="h-4 w-4" />
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    <span className="flex-1 text-sm text-text-primary/80">{tag.name}</span>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => startEditingTag(tag)}
-                      className="hover:bg-overlay/10"
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                  </>
-                )}
+<Card className="bg-overlay/5 border-overlay/10">
+  <CardHeader className="flex flex-row items-center justify-between">
+    <CardTitle>Tag Management</CardTitle>
+    <Button
+      variant="ghost"
+      size="icon"
+      onClick={() => setIsTagCreateDialogOpen(true)}
+      className="hover:bg-overlay/10"
+    >
+      <Plus className="h-4 w-4" />
+    </Button>
+  </CardHeader>
+  <CardContent className="space-y-4">
+    {tags.length > 0 ? (
+      <div className="space-y-2">
+        {tags.map((tag) => (
+          <div key={tag.id} className="flex items-center gap-2">
+            {editingTagId === tag.id ? (
+              <>
+                <Input
+                  type="text"
+                  value={editingTagName}
+                  onChange={(e) => setEditingTagName(e.target.value)}
+                  className="flex-1 bg-overlay/5 border-overlay/10"
+                />
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => saveTagEdit(tag.id)}
+                  className="bg-overlay/5 hover:bg-overlay/10"
+                >
+                  <Save className="h-4 w-4" />
+                </Button>
+              </>
+            ) : (
+              <>
+                <span className="flex-1 text-sm text-text-primary/80">{tag.name}</span>
                 <Button
                   variant="ghost"
                   size="icon"
-                  onClick={() => openDeleteTagDialog(tag.id)}
+                  onClick={() => startEditingTag(tag)}
                   className="hover:bg-overlay/10"
                 >
-                  <Trash2 className="h-4 w-4 text-red-500" />
+                  <Edit className="h-4 w-4" />
                 </Button>
-              </div>
-            ))}
+              </>
+            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => openDeleteTagDialog(tag.id)}
+              className="hover:bg-overlay/10"
+            >
+              <Trash2 className="h-4 w-4 text-red-500" />
+            </Button>
           </div>
-        ) : (
-          <p className="text-sm text-text-primary/60">No tags created yet.</p>
-        )}
-      </CardContent>
-    </Card>
+        ))}
+      </div>
+    ) : (
+      <p className="text-sm text-text-primary/60">No tags created yet.</p>
+    )}
+  </CardContent>
+</Card>
   </div>
 
   {/* Group 2: Note Activity and Account Actions in a two-column layout on desktop */}
@@ -349,7 +342,6 @@ export default function Settings() {
             </div>
           </div>
       </CardContent>
-
     </Card>
 
     <Card className="bg-overlay/5 border-overlay/10">
@@ -435,13 +427,51 @@ export default function Settings() {
         </Button>
         <Button variant="destructive" 
         onClick={deleteTagHandler}
-        disabled={isLoadingTagDelete}>
+        disabled={isLoadingTagDelete}
+        className="bg-red-500 text-white hover:text-white">
           {isLoadingTagDelete ? 'Deleting...' : 'Delete'}
         </Button>
       </DialogFooter>
     </DialogContent>
   </Dialog>
-</div>
 
+  <Dialog open={isTagCreateDialogOpen} onOpenChange={setIsTagCreateDialogOpen}>
+  <DialogContent className="bg-bg-primary border-overlay/10 shadow-lg">
+    <DialogHeader>
+      <DialogTitle className="text-xl font-semibold text-text-primary">
+        Create New Tag
+      </DialogTitle>
+      <DialogDescription className="text-text-primary/60">
+        Enter a name for your new tag.
+      </DialogDescription>
+    </DialogHeader>
+    <div className="py-4">
+      <Input
+        type="text"
+        placeholder="Tag name"
+        value={newTagName}
+        onChange={(e) => setNewTagName(e.target.value)}
+        className="w-full bg-overlay/5 border-overlay/10"
+      />
+    </div>
+    <DialogFooter>
+      <Button
+        variant="outline"
+        onClick={() => setIsTagCreateDialogOpen(false)}
+        className="bg-overlay/5 hover:bg-overlay/10"
+      >
+        Cancel
+      </Button>
+      <Button
+        onClick={createNewTag}
+        disabled={isTagCreate || !newTagName.trim()}
+        className="bg-overlay/10 hover:bg-overlay/20"
+      >
+        {isTagCreate ? 'Adding...' : 'Create Tag'}
+      </Button>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>
+</div>
     );
 }
