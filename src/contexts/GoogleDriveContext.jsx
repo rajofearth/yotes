@@ -61,6 +61,7 @@ export function GoogleDriveProvider({ children }) {
         if (!session || !session.provider_token) {
           console.log('No active session or missing provider_token');
           setIsSignedOut(true);
+          localStorage.clear();
           navigate('/login', { replace: true });
           setIsLoading(false);
           return;

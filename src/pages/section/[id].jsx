@@ -1,5 +1,5 @@
 import { useLocation, useNavigate } from 'react-router-dom';
-import { NoteCard } from '../../components/home/noteRender';
+import { NoteCard } from '../../components/home/noteCard';
 import { Button } from '../../components/ui/button';
 import { ArrowLeft } from 'lucide-react';
 
@@ -21,7 +21,10 @@ export default function SectionView() {
                     <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
                         <ArrowLeft className="h-4 w-4" />
                     </Button>
-                    <h1 className="text-xl font-semibold">{title}</h1>
+                    <div className="flex items-baseline gap-2">
+                        <h1 className="text-xl font-semibold">{title}</h1>
+                        <span className="text-xs text-text-primary/60">{notes.length} notes</span>
+                    </div>
                 </div>
             </header>
             <main className="max-w-[1920px] mx-auto px-4 py-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

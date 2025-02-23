@@ -1,12 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { groupNotesByDate } from '../components/home/grpNotesByDate';
-import { NotesSection } from '../components/home/renderSection';
+import { NotesSection } from '../components/home/notesSection';
 import { TagFilters } from '../components/home/TagFilters';
 import NavBar from '../components/home/navBar';
 import { useNotes } from '../hooks/useNotes';
 import { useGoogleDrive } from '../contexts/GoogleDriveContext';
 import { useLocation } from 'react-router-dom';
-import { Progress } from '../components/ui/progress'; // UPDATED: Import Progress component
+import { Progress } from '../components/ui/progress'; 
 
 // Simple debounce function
 const debounce = (func, delay) => {

@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
-import { NoteCard } from './noteRender';
+import { NoteCard } from './noteCard';
 import { Button } from '../ui/button';
 import { ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';

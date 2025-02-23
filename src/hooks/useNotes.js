@@ -1,12 +1,12 @@
-import { useState, useEffect, useCallback, useRef } from 'react'; // UPDATED: Import useRef
+import { useState, useEffect, useCallback, useRef } from 'react'; 
 import { useGoogleDrive } from '../contexts/GoogleDriveContext';
 import { useToast } from '../contexts/ToastContext';
 
 const CACHE_KEY = 'notes_cache';
 const CACHE_TIMESTAMP_KEY = 'notes_cache_timestamp';
 const TAGS_CACHE_KEY = 'tags_cache';
-const TAGS_CACHE_TIMESTAMP_KEY = 'tags_cache_timestamp'; // UPDATED: Added timestamp key for tags
-const CACHE_DURATION = 15 * 60 * 1000; // Increased cache duration to 15 minutes
+const TAGS_CACHE_TIMESTAMP_KEY = 'tags_cache_timestamp'; 
+const CACHE_DURATION = 15 * 60 * 1000; 
 
 export function useNotes() {
     const { driveApi, folderIds, isLoading: isDriveLoading, isSignedOut } = useGoogleDrive();
@@ -20,7 +20,7 @@ export function useNotes() {
     });
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [loadingProgress, setLoadingProgress] = useState(0); // UPDATED: Progress state
+    const [loadingProgress, setLoadingProgress] = useState(0); 
     const showToast = useToast();
     const loadCounter = useRef(0);
 
@@ -35,14 +35,14 @@ export function useNotes() {
         if (!force && !shouldRefreshCache(CACHE_KEY) && !shouldRefreshCache(TAGS_CACHE_KEY)) {
             console.log('Using cached data');
             setIsLoading(false);
-            setLoadingProgress(100); // UPDATED: Set progress to 100%
+            setLoadingProgress(100); 
             return;
         }
 
         if (!driveApi || !folderIds?.notes || !folderIds?.tags || isSignedOut) {
             setError(isSignedOut ? null : new Error('Drive API not initialized'));
             setIsLoading(false);
-            setLoadingProgress(0); // UPDATED: Reset progress
+            setLoadingProgress(0); 
             return;
         }
 
