@@ -4,15 +4,25 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Edit, Plus, Save, X, Trash2 } from 'lucide-react';
 
-export const TagManagementCard = ({ tags, tagState, setTagState, setDialogs, handleTagAction }) => {
+export const TagManagementCard = ({
+  tags,
+  tagState,
+  setTagState,
+  setDialogs,
+  handleTagAction,
+}) => {
   const inputRef = useRef(null);
   const cardRef = useRef(null);
   const scrollContainerRef = useRef(null);
   const [gradients, setGradients] = useState({ top: false, bottom: false });
 
   useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (tagState.editingId && cardRef.current && !cardRef.current.contains(event.target)) {
+    const handleClickOutside = event => {
+      if (
+        tagState.editingId &&
+        cardRef.current &&
+        !cardRef.current.contains(event.target)
+      ) {
         setTagState(prev => ({ ...prev, editingId: null, editingName: '' }));
       }
     };
@@ -33,7 +43,7 @@ export const TagManagementCard = ({ tags, tagState, setTagState, setDialogs, han
         const { scrollTop, clientHeight, scrollHeight } = container;
         setGradients({
           top: scrollTop > 0,
-          bottom: scrollTop + clientHeight < scrollHeight
+          bottom: scrollTop + clientHeight < scrollHeight,
         });
       };
       updateGradients();
@@ -46,7 +56,7 @@ export const TagManagementCard = ({ tags, tagState, setTagState, setDialogs, han
     setTagState(prev => ({ ...prev, editingId: null, editingName: '' }));
   };
 
-  const handleSave = (tagId) => {
+  const handleSave = tagId => {
     if (tagState.editingName.trim()) {
       handleTagAction('update', { id: tagId, name: tagState.editingName });
     } else {
@@ -65,8 +75,11 @@ export const TagManagementCard = ({ tags, tagState, setTagState, setDialogs, han
 
   return (
     <Card ref={cardRef} className="bg-overlay/5 border-overlay/10">
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle>Tag Management</CardTitle>
+      <CardHeader className="grid grid-cols-[1fr_auto] items-center gap-4">
+        <div className="flex flex-col">
+          <CardTitle>Tag Management</CardTitle>
+          <p className="text-sm text-muted-foreground">{tags?.length || 0} Tags</p>
+        </div>
         <Button
           variant="ghost"
           size="icon"
@@ -81,7 +94,7 @@ export const TagManagementCard = ({ tags, tagState, setTagState, setDialogs, han
           <div className="relative">
             <ul
               ref={scrollContainerRef}
-              className="space-y-2 overflow-y-auto pr-2"
+              className="space-y-2 overflow-y-auto pr-2 scrollbar-hide rounded"
               style={{ maxHeight }}
             >
               {tags.map(tag => (
@@ -94,7 +107,12 @@ export const TagManagementCard = ({ tags, tagState, setTagState, setDialogs, han
                       <Input
                         ref={inputRef}
                         value={tagState.editingName}
-                        onChange={e => setTagState(prev => ({ ...prev, editingName: e.target.value }))}
+                        onChange={e =>
+                          setTagState(prev => ({
+                            ...prev,
+                            editingName: e.target.value,
+                          }))
+                        }
                         onKeyDown={e => handleKeyDown(e, tag.id)}
                         className="flex-1 bg-overlay/5 border-overlay/10 h-8 text-sm"
                         placeholder="Enter tag name"
@@ -118,11 +136,19 @@ export const TagManagementCard = ({ tags, tagState, setTagState, setDialogs, han
                     </>
                   ) : (
                     <>
-                      <span className="flex-1 text-sm text-text-primary/80 truncate">{tag.name}</span>
+                      <span className="flex-1 text-sm text-text-primary/80 truncate">
+                        {tag.name}
+                      </span>
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => setTagState(prev => ({ ...prev, editingId: tag.id, editingName: tag.name }))}
+                        onClick={() =>
+                          setTagState(prev => ({
+                            ...prev,
+                            editingId: tag.id,
+                            editingName: tag.name,
+                          }))
+                        }
                         className="h-8 w-8 hover:bg-overlay/10"
                       >
                         <Edit className="h-4 w-4" />
@@ -144,10 +170,10 @@ export const TagManagementCard = ({ tags, tagState, setTagState, setDialogs, han
               ))}
             </ul>
             {gradients.top && (
-              <div className="absolute top-0 left-0 right-0 h-12 bg-gradient-to-b from-bg-primary via-bg-primary/80 to-transparent pointer-events-none" />
+              <div className="absolute top-0 left-0 right-0 h-12 bg-gradient-to-b from-bg-primary via-bg-primary/80 to-transparent pointer-events-none rounded" />
             )}
             {gradients.bottom && (
-              <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-bg-primary via-bg-primary/80 to-transparent pointer-events-none" />
+              <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-bg-primary via-bg-primary/80 to-transparent pointer-events-none rounded" />
             )}
           </div>
         ) : (

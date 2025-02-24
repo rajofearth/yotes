@@ -20,13 +20,14 @@ import ViewNote from './pages/note/view/[id]';
 import SectionView from './pages/section/[id]';
 import Settings from './pages/settings';
 import ErrorBoundary from './components/ErrorBoundary';
+import ProgressBar from './components/ProgressBar';
 
 function ProtectedRoute({ children }) {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const { isLoading: isDriveLoading } = useGoogleDrive();
-  const { isLoading: isNotesLoading, error: notesError } = useNotes();
+  const { isLoading: isNotesLoading, isSyncing, isInitialSync, error: notesError, loadingState } = useNotes();
 
   useEffect(() => {
     console.log('ProtectedRoute useEffect running...');
@@ -58,11 +59,12 @@ function ProtectedRoute({ children }) {
     return () => subscription.unsubscribe();
   }, [navigate, loading]);
 
-  if (loading || isNotesLoading) {
+  // Show progress bar during initial load (session or notes) or initial Drive sync
+  if (loading || isNotesLoading || (isSyncing && isInitialSync)) {
     console.log('ProtectedRoute loading state:', { loading, isDriveLoading, isNotesLoading });
     return (
       <div className="min-h-screen bg-bg-primary flex items-center justify-center">
-        <div className="text-text-primary">Loading your notes...</div>
+        <ProgressBar progress={loadingState.progress} message={loadingState.message} />
       </div>
     );
   }

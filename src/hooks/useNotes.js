@@ -18,10 +18,11 @@ export function useNotes() {
   const [tags, setTags] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isInitialSync, setIsInitialSync] = useState(true); // Track first sync
   const [error, setError] = useState(null);
-  const [loadingProgress, setLoadingProgress] = useState(0);
+  const [loadingState, setLoadingState] = useState({ progress: 0, message: 'Initializing...' });
   const showToast = useToast();
-  const hasLoadedFromDrive = useRef(false); // Prevent repeated loads
+  const hasLoadedFromDrive = useRef(false);
 
   const shouldRefreshCache = useCallback(async (storeName) => {
     try {
@@ -34,6 +35,7 @@ export function useNotes() {
   }, []);
 
   const loadInitialData = useCallback(async () => {
+    setLoadingState({ progress: 10, message: 'Checking local notes...' });
     console.log('Loading initial data from IndexedDB...');
     try {
       const cachedNotes = (await getFromDB('notes', 'notes_data')) || [];
@@ -41,10 +43,12 @@ export function useNotes() {
       setNotes(cachedNotes);
       setTags(cachedTags);
       console.log('Initial data loaded:', { notes: cachedNotes.length, tags: cachedTags.length });
+      setLoadingState({ progress: 30, message: 'Local data loaded' });
       return { notes: cachedNotes, tags: cachedTags };
     } catch (err) {
       console.error('Failed to load initial data from IndexedDB:', err);
       setError(err);
+      setLoadingState({ progress: 100, message: 'Error loading local data' });
       throw err;
     } finally {
       setIsLoading(false);
@@ -54,11 +58,13 @@ export function useNotes() {
   const loadData = useCallback(async (force = false) => {
     if (!driveApi || !folderIds?.notes || !folderIds?.tags || isSignedOut) {
       console.log('Drive not ready or signed out, skipping loadData');
+      setLoadingState({ progress: 40, message: 'Waiting for Google Drive...' });
       return;
     }
 
     setIsSyncing(true);
     setError(null);
+    setLoadingState({ progress: 40, message: 'Connecting to Google Drive...' });
     console.log('Starting loadData...', { force });
 
     try {
@@ -67,6 +73,7 @@ export function useNotes() {
 
       let tagsData = tags;
       if (tagsRefreshNeeded) {
+        setLoadingState({ progress: 60, message: 'Loading tags...' });
         console.log('Fetching tags from Google Drive...');
         const { files } = await driveApi.listFiles(folderIds.tags);
         const tagsFile = files.find((f) => f.name === 'tags.json');
@@ -80,10 +87,12 @@ export function useNotes() {
         await setInDB('tags', 'tags_data', tagsData);
         await setInDB('tags', 'tags_timestamp', Date.now());
         console.log('Tags loaded and saved:', tagsData.length);
+        setLoadingState({ progress: 80, message: 'Tags loaded' });
       }
 
       let notesData = notes;
       if (notesRefreshNeeded) {
+        setLoadingState({ progress: 90, message: 'Loading notes...' });
         console.log('Fetching notes from Google Drive...');
         const { files } = await driveApi.listFiles(folderIds.notes);
         if (files.length) {
@@ -102,13 +111,18 @@ export function useNotes() {
         await setInDB('notes', 'notes_timestamp', Date.now());
         console.log('Notes loaded and saved:', notesData.length);
       }
+      setLoadingState({ progress: 100, message: 'All set!' });
+      // Delay to let user see completion
+      await new Promise((resolve) => setTimeout(resolve, 500));
     } catch (err) {
       console.error('Error in loadData:', err);
       setError(err);
       showToast(`Failed to load data: ${err.message}`, 'error');
+      setLoadingState({ progress: 100, message: 'Error syncing with Drive' });
     } finally {
       console.log('loadData complete, setting isSyncing to false');
       setIsSyncing(false);
+      setIsInitialSync(false); // Mark initial sync complete
     }
   }, [driveApi, folderIds, isSignedOut, showToast]);
 
@@ -116,6 +130,7 @@ export function useNotes() {
     if (!driveApi || !folderIds || isSignedOut) return;
 
     setIsSyncing(true);
+    // No loadingState updates here to keep it silent
     try {
       const queue = await getSyncQueue();
       for (const operation of queue) {
@@ -168,7 +183,6 @@ export function useNotes() {
     }
   }, [driveApi, folderIds, isSignedOut, notes, tags, showToast]);
 
-  // Initial load from IndexedDB
   useEffect(() => {
     console.log('Running initial load useEffect');
     loadInitialData().catch((err) => {
@@ -177,7 +191,6 @@ export function useNotes() {
     });
   }, [loadInitialData, showToast]);
 
-  // Sync with Google Drive when ready, but only once
   useEffect(() => {
     if (!hasLoadedFromDrive.current && !isDriveLoading && !isSignedOut && driveApi && folderIds) {
       console.log('Drive ready, calling loadData');
@@ -186,7 +199,6 @@ export function useNotes() {
     }
   }, [isDriveLoading, isSignedOut, driveApi, folderIds, loadData]);
 
-  // Periodic sync
   useEffect(() => {
     const interval = setInterval(syncToGoogleDrive, 5000);
     return () => clearInterval(interval);
@@ -313,7 +325,7 @@ export function useNotes() {
   );
 
   const refreshData = useCallback(() => {
-    hasLoadedFromDrive.current = false; // Allow manual refresh
+    hasLoadedFromDrive.current = false;
     loadData(true);
   }, [loadData]);
 
@@ -322,6 +334,7 @@ export function useNotes() {
     tags,
     isLoading,
     isSyncing,
+    isInitialSync, // Expose for ProtectedRoute
     error,
     createNote,
     updateNote,
@@ -330,6 +343,6 @@ export function useNotes() {
     updateTag,
     deleteTag,
     refreshData,
-    loadingProgress,
+    loadingState,
   };
 }
