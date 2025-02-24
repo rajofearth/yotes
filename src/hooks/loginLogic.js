@@ -1,4 +1,5 @@
-import { useState } from 'react';
+// src/hooks/loginLogic.js
+import { useState } from 'react'; // Added missing import
 import { supabase } from '../utils/supabaseClient';
 
 const GOOGLE_DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
@@ -16,13 +17,12 @@ export const useLoginLogic = (showToast, navigate) => {
           redirectTo: `${window.location.origin}/auth/callback`,
           scopes: GOOGLE_DRIVE_SCOPE,
           queryParams: {
-            access_type: 'offline',
-            prompt: 'consent',
+            access_type: 'offline', // Ensures refresh token is returned
+            prompt: 'consent',      // Forces consent screen to return refresh token
             include_granted_scopes: 'true'
           }
         }
       });
-
       if (error) throw error;
     } catch (error) {
       showToast(error.message, 'error');
@@ -30,9 +30,5 @@ export const useLoginLogic = (showToast, navigate) => {
     }
   };
 
-  return {
-    isLoading,
-    isGoogleLoading,
-    handleGoogleLogin
-  };
+  return { isLoading, isGoogleLoading, handleGoogleLogin };
 };

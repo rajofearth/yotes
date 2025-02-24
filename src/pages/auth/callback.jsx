@@ -1,6 +1,8 @@
+// src/pages/auth/callback.jsx
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../utils/supabaseClient';
+import { setInDB } from '../../utils/indexedDB'; // Added missing import
 
 export default function AuthCallback() {
   const navigate = useNavigate();
@@ -9,38 +11,27 @@ export default function AuthCallback() {
   useEffect(() => {
     const handleAuthCallback = async () => {
       try {
-        // Attempt to get the session immediately
-        let { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        let { data: { session }, error } = await supabase.auth.getSession();
+        if (error) throw error;
 
-        if (sessionError) {
-          console.error('Initial session error:', sessionError);
-          throw sessionError;
-        }
-
-        // If no provider_token, force a refresh to complete the OAuth exchange
-        if (!session?.provider_token) {
-          console.log('No provider_token found, refreshing session...');
+        if (!session?.provider_token || !session?.provider_refresh_token) {
           const { error: refreshError } = await supabase.auth.refreshSession();
-          if (refreshError) {
-            throw new Error(`Refresh failed: ${refreshError.message}`);
-          }
-
-          // Re-fetch session after refresh
+          if (refreshError) throw refreshError;
           const refreshed = await supabase.auth.getSession();
           session = refreshed.data.session;
-          if (!session?.provider_token) {
-            throw new Error('No access token received from Google after refresh');
+          if (!session?.provider_token || !session?.provider_refresh_token) {
+            throw new Error('No Google tokens received');
           }
         }
 
-        //console.log('Auth callback succeeded with session:', session);
+        await setInDB('sessions', 'session', session); // Ensure session is saved
         navigate('/', { replace: true });
       } catch (error) {
         console.error('Auth callback error:', error);
         setErrorMessage(error.message);
         navigate('/login', {
           replace: true,
-          state: { error: error.message || 'Authentication failed. Please try again.' },
+          state: { error: error.message || 'Authentication failed' },
         });
       }
     };

@@ -8,10 +8,14 @@ import { openDB, getFromDB, setInDB, clearDB } from '../utils/indexedDB';
 
 const GoogleDriveContext = createContext(null);
 
+const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+const CLIENT_SECRET = import.meta.env.VITE_GOOGLE_CLIENT_SECRET;
+
 export function GoogleDriveProvider({ children }) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [accessToken, setAccessToken] = useState(null);
+  const [refreshTokenValue, setRefreshTokenValue] = useState(null);
   const [refreshTimer, setRefreshTimer] = useState(null);
   const [folderIds, setFolderIds] = useState(null);
   const showToast = useToast();
@@ -22,37 +26,51 @@ export function GoogleDriveProvider({ children }) {
 
   const refreshToken = async () => {
     try {
-      //console.log('Refreshing session...');
-      const { data: { session }, error } = await supabase.auth.getSession();
-      if (error) throw error;
-      if (!session || !session.provider_token) {
-        throw new Error('No valid session or missing provider_token');
+      const cachedSession = await getFromDB('sessions', 'session');
+      const currentRefreshToken = refreshTokenValue || cachedSession?.provider_refresh_token;
+      if (!currentRefreshToken) {
+        throw new Error('No refresh token available');
       }
-      setAccessToken(session.provider_token);
-      await setInDB('sessions', 'session', session);
-      scheduleTokenRefresh(session);
-      //console.log('Session refreshed successfully');
+
+      const tempDriveApi = driveApi || new GoogleDriveAPI('temp-token');
+      const { provider_token, expires_in } = await tempDriveApi.refreshProviderToken(
+        currentRefreshToken,
+        CLIENT_ID,
+        CLIENT_SECRET
+      );
+
+      setAccessToken(provider_token);
+      setRefreshTokenValue(currentRefreshToken);
+
+      const updatedSession = {
+        ...cachedSession,
+        provider_token,
+        expires_in,
+        expires_at: Math.floor(Date.now() / 1000) + expires_in
+      };
+      await setInDB('sessions', 'session', updatedSession);
+      scheduleTokenRefresh(expires_in);
     } catch (err) {
       console.error('Refresh failed:', err);
-      showToast('Google Drive access expired. Sign in again to reconnect.', 'error');
+      showToast('Google Drive access expired. Please sign in again.', 'error');
       setAccessToken(null);
       setFolderIds(null);
-      // Do not clearDB or redirect here; let App.jsx handle sign-out
+      await supabase.auth.signOut();
+      await clearDB();
     }
   };
 
-  const scheduleTokenRefresh = (session) => {
+  const scheduleTokenRefresh = (expiresIn) => {
     if (refreshTimer) clearTimeout(refreshTimer);
-    const REFRESH_MARGIN = 5 * 60 * 1000;
-    const expiresIn = session.expires_in ? session.expires_in * 1000 : 55 * 60 * 1000;
-    const refreshTime = expiresIn - REFRESH_MARGIN;
+    const REFRESH_MARGIN = 5 * 60 * 1000; // 5 minutes before expiry
+    const refreshTime = (expiresIn * 1000) - REFRESH_MARGIN;
     const timer = setTimeout(refreshToken, refreshTime);
     setRefreshTimer(timer);
   };
 
   const initializeGoogleDrive = async () => {
     try {
-      //console.log('Starting Google Drive initialization...');
+      console.log('Starting Google Drive initialization...');
       const cachedSession = await getFromDB('sessions', 'session');
       const { data: { session }, error } = await supabase.auth.getSession();
       if (error) throw error;
@@ -63,23 +81,22 @@ export function GoogleDriveProvider({ children }) {
         return;
       }
 
-      if (!session.provider_token) {
-        console.log('No provider_token found; Drive features disabled');
-        setIsLoading(false);
+      if (!session.provider_token || !session.provider_refresh_token) {
+        console.log('Missing provider tokens; signing out');
         await supabase.auth.signOut();
         await clearDB();
+        setIsLoading(false);
         return;
       }
 
       setAccessToken(session.provider_token);
+      setRefreshTokenValue(session.provider_refresh_token);
       await setInDB('sessions', 'session', session);
-      scheduleTokenRefresh(session);
+      scheduleTokenRefresh(session.expires_in);
 
-      //console.log('Initializing Drive structure...');
       const structureManager = new DriveStructureManager(new GoogleDriveAPI(session.provider_token));
       const folders = await structureManager.initializeStructure();
       setFolderIds(folders);
-      //console.log('Drive initialized, setting isLoading to false');
       setIsLoading(false);
     } catch (err) {
       console.error('Initialization error:', err);
