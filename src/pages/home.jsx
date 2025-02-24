@@ -6,15 +6,9 @@ import NavBar from '../components/home/navBar';
 import { useNotes } from '../hooks/useNotes';
 import { useGoogleDrive } from '../contexts/GoogleDriveContext';
 import { useLocation } from 'react-router-dom';
-import { Progress } from '../components/ui/progress';
-
-const debounce = (func, delay) => {
-    let timeoutId;
-    return (...args) => {
-        clearTimeout(timeoutId);
-        timeoutId = setTimeout(() => func(...args), delay);
-    };
-};
+import { applyFiltersAndSearch, debounce } from '../utils/noteFilters';
+import { LoadingState } from '../components/home/LoadingState';
+import { ErrorState } from '../components/home/ErrorState';
 
 export default function Home() {
     const { isLoading: isDriveLoading } = useGoogleDrive();
@@ -24,26 +18,10 @@ export default function Home() {
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedTagIds, setSelectedTagIds] = useState(['all']);
 
-    const applyFiltersAndSearch = useCallback((notesList, query, tagIds) => {
-        let filtered = [...notesList];
-        if (!tagIds.includes('all') && tagIds.length > 0) {
-            filtered = filtered.filter(note => note.tags?.some(tagId => tagIds.includes(tagId)));
-        }
-        if (query) {
-            const lowerQuery = query.toLowerCase();
-            filtered = filtered.filter(note =>
-                note.title?.toLowerCase().includes(lowerQuery) ||
-                note.description?.toLowerCase().includes(lowerQuery) ||
-                note.content?.toLowerCase().includes(lowerQuery)
-            );
-        }
-        setFilteredNotes(filtered);
-    }, []);
-
     useEffect(() => {
         if (location.state?.refresh) refreshData();
-        applyFiltersAndSearch(notes, searchQuery, selectedTagIds);
-    }, [notes, searchQuery, selectedTagIds, applyFiltersAndSearch, location.state?.refresh, refreshData]);
+        setFilteredNotes(applyFiltersAndSearch(notes, searchQuery, selectedTagIds));
+    }, [notes, searchQuery, selectedTagIds, location.state?.refresh, refreshData]);
 
     const handleSearch = useCallback(debounce(query => setSearchQuery(query), 300), []);
     const handleFilterChange = tagIds => setSelectedTagIds(tagIds.length === 0 ? ['all'] : tagIds);
@@ -51,20 +29,11 @@ export default function Home() {
     const groupedNotes = useMemo(() => groupNotesByDate(filteredNotes), [filteredNotes]);
 
     if (isDriveLoading || isNotesLoading) {
-        return (
-            <div className="min-h-screen bg-bg-primary flex flex-col items-center justify-center gap-4">
-                <span className="text-text-primary">Loading notes...</span>
-                <Progress value={loadingProgress} className="w-64" />
-            </div>
-        );
+        return <LoadingState loadingProgress={loadingProgress} />;
     }
 
     if (error) {
-        return (
-            <div className="min-h-screen bg-bg-primary flex items-center justify-center">
-                <span className="text-text-primary">Error: {error.message}</span>
-            </div>
-        );
+        return <ErrorState error={error} />;
     }
 
     return (

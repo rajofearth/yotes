@@ -277,7 +277,7 @@ export default function Settings() {
 </Card>
   </div>
 
-  {/* Group 2: Note Activity and Account Actions in a two-column layout on desktop */}
+  {/* Group 2: Note Activity and Account Actions in a three-column layout on desktop */}
   <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
     <Card className="bg-overlay/5 border-overlay/10 lg:col-span-2">
       <CardHeader>
