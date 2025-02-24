@@ -1,9 +1,9 @@
+// src/contexts/GoogleDriveContext.jsx
 import { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import { supabase } from '../utils/supabaseClient';
 import { useToast } from './ToastContext';
 import { GoogleDriveAPI } from '../utils/googleDrive';
 import { DriveStructureManager } from '../utils/driveStructure';
-import { useNavigate } from 'react-router-dom';
 import { openDB, getFromDB, setInDB, clearDB } from '../utils/indexedDB';
 
 const GoogleDriveContext = createContext(null);
@@ -14,18 +14,15 @@ export function GoogleDriveProvider({ children }) {
   const [accessToken, setAccessToken] = useState(null);
   const [refreshTimer, setRefreshTimer] = useState(null);
   const [folderIds, setFolderIds] = useState(null);
-  const [isSignedOut, setIsSignedOut] = useState(false);
   const showToast = useToast();
-  const navigate = useNavigate();
 
   const driveApi = useMemo(() => {
-    return accessToken && !isSignedOut ? new GoogleDriveAPI(accessToken) : null;
-  }, [accessToken, isSignedOut]);
+    return accessToken ? new GoogleDriveAPI(accessToken) : null;
+  }, [accessToken]);
 
   const refreshToken = async () => {
-    if (isSignedOut) return;
     try {
-      console.log('Refreshing session...');
+      //console.log('Refreshing session...');
       const { data: { session }, error } = await supabase.auth.getSession();
       if (error) throw error;
       if (!session || !session.provider_token) {
@@ -34,13 +31,13 @@ export function GoogleDriveProvider({ children }) {
       setAccessToken(session.provider_token);
       await setInDB('sessions', 'session', session);
       scheduleTokenRefresh(session);
-      console.log('Session refreshed successfully');
+      //console.log('Session refreshed successfully');
     } catch (err) {
       console.error('Refresh failed:', err);
-      showToast('Session expired. Please sign in again.', 'error');
-      setIsSignedOut(true);
-      await clearDB();
-      navigate('/login');
+      showToast('Google Drive access expired. Sign in again to reconnect.', 'error');
+      setAccessToken(null);
+      setFolderIds(null);
+      // Do not clearDB or redirect here; let App.jsx handle sign-out
     }
   };
 
@@ -55,17 +52,22 @@ export function GoogleDriveProvider({ children }) {
 
   const initializeGoogleDrive = async () => {
     try {
-      console.log('Starting Google Drive initialization...');
+      //console.log('Starting Google Drive initialization...');
       const cachedSession = await getFromDB('sessions', 'session');
       const { data: { session }, error } = await supabase.auth.getSession();
       if (error) throw error;
 
-      if (!session || !session.provider_token) {
-        console.log('No session or provider_token, redirecting to login');
-        setIsSignedOut(true);
-        await clearDB();
-        navigate('/login', { replace: true });
+      if (!session) {
+        console.log('No session found');
         setIsLoading(false);
+        return;
+      }
+
+      if (!session.provider_token) {
+        console.log('No provider_token found; Drive features disabled');
+        setIsLoading(false);
+        await supabase.auth.signOut();
+        await clearDB();
         return;
       }
 
@@ -73,60 +75,22 @@ export function GoogleDriveProvider({ children }) {
       await setInDB('sessions', 'session', session);
       scheduleTokenRefresh(session);
 
-      console.log('Initializing Drive structure...');
+      //console.log('Initializing Drive structure...');
       const structureManager = new DriveStructureManager(new GoogleDriveAPI(session.provider_token));
       const folders = await structureManager.initializeStructure();
       setFolderIds(folders);
-      console.log('Drive initialized, setting isLoading to false');
+      //console.log('Drive initialized, setting isLoading to false');
       setIsLoading(false);
     } catch (err) {
       console.error('Initialization error:', err);
       setError(err);
-      navigate('/login', { replace: true });
       setIsLoading(false);
     }
   };
 
   useEffect(() => {
     initializeGoogleDrive();
-  }, [navigate, showToast]);
-
-  // Move subscription outside useEffect to prevent re-subscription
-  useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('Auth state changed:', event);
-      if (event === 'SIGNED_OUT') {
-        setAccessToken(null);
-        setFolderIds(null);
-        setIsSignedOut(true);
-        if (refreshTimer) clearTimeout(refreshTimer);
-        await clearDB();
-        navigate('/login', { replace: true });
-      } else if (event === 'TOKEN_REFRESHED' && session?.provider_token) {
-        setAccessToken(session.provider_token);
-        await setInDB('sessions', 'session', session);
-        scheduleTokenRefresh(session);
-      } else if (event === 'SIGNED_IN' && session?.provider_token) {
-        setAccessToken(session.provider_token);
-        setIsSignedOut(false);
-        await setInDB('sessions', 'session', session);
-        scheduleTokenRefresh(session);
-        setIsLoading(false);
-      } else if (event === 'INITIAL_SESSION') {
-        if (session && session.provider_token) {
-          setAccessToken(session.provider_token);
-          setIsSignedOut(false);
-          await setInDB('sessions', 'session', session);
-          scheduleTokenRefresh(session);
-          setIsLoading(false);
-        } else {
-          setIsSignedOut(true);
-          navigate('/login', { replace: true });
-        }
-      }
-    });
-    return () => subscription.unsubscribe();
-  }, [navigate, showToast]); // Removed refreshTimer from deps
+  }, []);
 
   const value = {
     isLoading,
@@ -134,7 +98,6 @@ export function GoogleDriveProvider({ children }) {
     driveApi,
     folderIds,
     refreshToken,
-    isSignedOut,
   };
 
   return (

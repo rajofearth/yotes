@@ -33,7 +33,7 @@ export default function AuthCallback() {
           }
         }
 
-        console.log('Auth callback succeeded with session:', session);
+        //console.log('Auth callback succeeded with session:', session);
         navigate('/', { replace: true });
       } catch (error) {
         console.error('Auth callback error:', error);

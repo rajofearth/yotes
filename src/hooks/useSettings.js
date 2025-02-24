@@ -1,9 +1,10 @@
+// src/hooks/useSettings.js
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../utils/supabaseClient';
 import { useNotes } from './useNotes';
 import { useToast } from '../contexts/ToastContext';
-import { openDB, clearDB } from '../utils/indexedDB';
+import { deleteDB } from '../utils/indexedDB';
 
 export const useSettings = () => {
   const navigate = useNavigate();
@@ -25,11 +26,20 @@ export const useSettings = () => {
     setLoading(prev => ({ ...prev, logout: true }));
     try {
       await supabase.auth.signOut();
-      await clearDB();
+      try {
+        await deleteDB();
+      } catch (error) {
+        if (error.message === 'Database deletion blocked after retry') {
+          showToast('Logout successful, but local data cleanup delayed. Close all tabs to complete.', 'warning');
+        } else {
+          throw error;
+        }
+      }
       showToast('Logged out successfully', 'success');
       navigate('/login', { replace: true });
     } catch (error) {
-      showToast('Failed to log out', 'error');
+      console.error('Logout error:', error);
+      showToast(`Failed to log out: ${error.message}`, 'error');
     } finally {
       setLoading(prev => ({ ...prev, logout: false }));
     }
@@ -39,11 +49,19 @@ export const useSettings = () => {
     setLoading(prev => ({ ...prev, delete: true }));
     try {
       await supabase.auth.signOut();
-      await clearDB();
+      try {
+        await deleteDB();
+      } catch (error) {
+        if (error.message === 'Database deletion blocked after retry') {
+          showToast('Account deletion requested, but local data cleanup delayed. Close all tabs to complete.', 'warning');
+        } else {
+          throw error;
+        }
+      }
       showToast('Account deletion requested. Contact support.', 'success');
       navigate('/login', { replace: true });
     } catch (error) {
-      showToast('Failed to initiate account deletion', 'error');
+      showToast(`Failed to initiate account deletion: ${error.message}`, 'error');
     } finally {
       setLoading(prev => ({ ...prev, delete: false }));
       setDialogs(prev => ({ ...prev, deleteAccount: false }));
