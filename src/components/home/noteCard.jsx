@@ -102,7 +102,7 @@ export const NoteCard = ({ note, refreshNotes }) => {
                         </DropdownMenuContent>
                     </DropdownMenu>
                 </div>
-                <div className="text-xs text-text-primary/60 leading-tight">
+                <div className="text-xs text-text-primary/60 leading-tight overflow-x-hidden">
                     {truncatedDescription}
                 </div>
             </div>
