@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../utils/supabaseClient';
 import { useNotes } from './useNotes';
 import { useToast } from '../contexts/ToastContext';
+import { openDB, clearDB } from '../utils/indexedDB';
 
 export const useSettings = () => {
   const navigate = useNavigate();
@@ -20,17 +21,11 @@ export const useSettings = () => {
     });
   }, [showToast]);
 
-  const clearCache = () => {
-    ['notes_cache', 'notes_cache_timestamp', 'tags_cache', 'tags_cache_timestamp']
-      .forEach(key => localStorage.removeItem(key));
-    sessionStorage.clear();
-  };
-
   const handleLogout = async () => {
     setLoading(prev => ({ ...prev, logout: true }));
     try {
       await supabase.auth.signOut();
-      clearCache();
+      await clearDB();
       showToast('Logged out successfully', 'success');
       navigate('/login', { replace: true });
     } catch (error) {
@@ -44,7 +39,7 @@ export const useSettings = () => {
     setLoading(prev => ({ ...prev, delete: true }));
     try {
       await supabase.auth.signOut();
-      clearCache();
+      await clearDB();
       showToast('Account deletion requested. Contact support.', 'success');
       navigate('/login', { replace: true });
     } catch (error) {

@@ -26,21 +26,26 @@ function ProtectedRoute({ children }) {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const { isLoading: isDriveLoading } = useGoogleDrive();
-  const { isLoading: isNotesLoading } = useNotes();
+  const { isLoading: isNotesLoading, error: notesError } = useNotes();
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session }, error }) => {
-      if (error) console.error('Session error:', error);
-      setSession(session);
-      setLoading(false);
-      if (!session) {
+    console.log('ProtectedRoute useEffect running...');
+    supabase.auth.getSession()
+      .then(({ data: { session }, error }) => {
+        if (error) console.error('Session error:', error);
+        setSession(session);
+        setLoading(false);
+        if (!session) {
+          console.log('No session, redirecting to login');
+          navigate('/login', { replace: true });
+        }
+        console.log('Session check complete:', { session: !!session });
+      })
+      .catch((err) => {
+        console.error('Session fetch failed:', err);
+        setLoading(false);
         navigate('/login', { replace: true });
-      }
-    }).catch(err => {
-      console.error('Session fetch failed:', err);
-      setLoading(false);
-      navigate('/login', { replace: true });
-    });
+      });
 
     const {
       data: { subscription },
@@ -53,7 +58,8 @@ function ProtectedRoute({ children }) {
     return () => subscription.unsubscribe();
   }, [navigate, loading]);
 
-  if (loading || isDriveLoading || isNotesLoading) {
+  if (loading || isNotesLoading) {
+    console.log('ProtectedRoute loading state:', { loading, isDriveLoading, isNotesLoading });
     return (
       <div className="min-h-screen bg-bg-primary flex items-center justify-center">
         <div className="text-text-primary">Loading your notes...</div>
@@ -64,7 +70,7 @@ function ProtectedRoute({ children }) {
   if (session) {
     return (
       <ErrorBoundary
-        fallback={<div>Something went wrong with Google Drive integration</div>}
+        fallback={<div>{notesError ? `Error: ${notesError.message}` : 'Something went wrong'}</div>}
       >
         {children}
       </ErrorBoundary>
