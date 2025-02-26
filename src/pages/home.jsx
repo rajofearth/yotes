@@ -7,7 +7,7 @@ import { useNotes } from '../hooks/useNotes';
 import { useGoogleDrive } from '../contexts/GoogleDriveContext';
 import { useLocation } from 'react-router-dom';
 import { applyFiltersAndSearch, debounce } from '../utils/noteFilters';
-import { LoadingState } from '../components/home/LoadingState';
+import ProgressBar from '../components/ProgressBar';
 import { ErrorState } from '../components/home/ErrorState';
 
 export default function Home() {
@@ -17,6 +17,7 @@ export default function Home() {
     const [filteredNotes, setFilteredNotes] = useState(notes);
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedTagIds, setSelectedTagIds] = useState(['all']);
+    const [loadingState, setLoadingState] = useState({ progress: 0, message: 'Initializing...' });
 
     useEffect(() => {
         if (location.state?.refresh) refreshData();
@@ -29,7 +30,7 @@ export default function Home() {
     const groupedNotes = useMemo(() => groupNotesByDate(filteredNotes), [filteredNotes]);
 
     if (isDriveLoading || isNotesLoading) {
-        return <LoadingState loadingProgress={loadingProgress} />;
+        return <ProgressBar progress={loadingState.progress} message={loadingState.message} />;
     }
 
     if (error) {

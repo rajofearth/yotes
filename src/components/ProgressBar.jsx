@@ -1,12 +1,13 @@
 import React from 'react';
+import { TextShimmer } from './ui/text-shimmer';
 
 const ProgressBar = ({ progress, message }) => {
   return (
     <div className="w-full max-w-lg mx-auto p-6 flex flex-col items-center">
       {/* Yotes Branding */}
-      <h1 className="text-3xl md:text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400 mb-4">
-        Yotes
-      </h1>
+          <TextShimmer className='text-3xl md:text-4xl font-bold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400' duration={1}>
+              Yotes
+          </TextShimmer>
 
       {/* Progress Bar */}
       <div className="w-full bg-gray-700/50 rounded-full h-3 overflow-hidden shadow-md">

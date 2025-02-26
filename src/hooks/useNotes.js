@@ -198,6 +198,7 @@ export function useNotes() {
 
   useEffect(() => {
     if (!isDriveLoading && driveApi && folderIds && !hasLoadedFromDrive.current) {
+      setLoadingState({ progress: 40, message: 'Checking local notes...' });
       //console.log('Drive ready, calling loadData');
       loadData();
       hasLoadedFromDrive.current = true;
