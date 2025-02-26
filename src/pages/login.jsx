@@ -1,4 +1,3 @@
-// src/pages/login.jsx
 import { useNavigate } from 'react-router-dom';
 import GoogleButton from '../components/ui/google-button';
 import { useLoginLogic } from '../hooks/loginLogic';
