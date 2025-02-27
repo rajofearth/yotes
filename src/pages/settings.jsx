@@ -9,6 +9,8 @@ import { AccountActionsCard } from '../components/settings/AccountActionsCard';
 import { DeleteAccountDialog } from '../components/settings/DeleteAccountDialog';
 import { DeleteTagDialog } from '../components/settings/DeleteTagDialog';
 import { CreateTagDialog } from '../components/settings/CreateTagDialog';
+import { DonationCard } from '../components/settings/DonationCard'; 
+import { UPIDonationDialog } from '../components/settings/UPIDonationDialog';
 
 export default function Settings() {
   const {
@@ -24,14 +26,19 @@ export default function Settings() {
     handleLogout,
     handleDeleteAccount,
     handleTagAction,
-    noteActivity
+    noteActivity,
   } = useSettings();
 
   return (
     <div className="min-h-screen bg-bg-primary text-text-primary">
       <header className="border-b border-overlay/10">
         <div className="max-w-[1920px] mx-auto px-4 py-4 flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/')} disabled={loading.logout || loading.delete}>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate('/')}
+            disabled={loading.logout || loading.delete}
+          >
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <h1 className="text-xl font-semibold">Settings</h1>
@@ -41,16 +48,51 @@ export default function Settings() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           <StatisticsCard notes={notes} tags={tags} />
           <AccountDetailsCard user={user} />
-          <TagManagementCard tags={tags} tagState={tagState} setTagState={setTagState} setDialogs={setDialogs} handleTagAction={handleTagAction} />
+          <TagManagementCard
+            tags={tags}
+            tagState={tagState}
+            setTagState={setTagState}
+            setDialogs={setDialogs}
+            handleTagAction={handleTagAction}
+          />
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <NoteActivityCard notes={notes} noteActivity={noteActivity} />
-          <AccountActionsCard loading={loading} handleLogout={handleLogout} setDialogs={setDialogs} />
+        {/* Add Donation Section */}
+        <div className="grid grid-cols-1 gap-8">
+          <DonationCard setDialogs={setDialogs} />
+        </div>
+          <AccountActionsCard
+            loading={loading}
+            handleLogout={handleLogout}
+            setDialogs={setDialogs}
+          />
         </div>
       </main>
-      <DeleteAccountDialog open={dialogs.deleteAccount} onOpenChange={val => setDialogs(prev => ({ ...prev, deleteAccount: val }))} loading={loading} handleDeleteAccount={handleDeleteAccount} />
-      <DeleteTagDialog open={dialogs.deleteTag} onOpenChange={val => setDialogs(prev => ({ ...prev, deleteTag: val }))} loading={loading} handleTagAction={handleTagAction} tagId={tagState.tagToDelete} />
-      <CreateTagDialog open={dialogs.createTag} onOpenChange={val => setDialogs(prev => ({ ...prev, createTag: val }))} tagState={tagState} setTagState={setTagState} handleTagAction={handleTagAction} />
+      <DeleteAccountDialog
+        open={dialogs.deleteAccount}
+        onOpenChange={val => setDialogs(prev => ({ ...prev, deleteAccount: val }))}
+        loading={loading}
+        handleDeleteAccount={handleDeleteAccount}
+      />
+      <DeleteTagDialog
+        open={dialogs.deleteTag}
+        onOpenChange={val => setDialogs(prev => ({ ...prev, deleteTag: val }))}
+        loading={loading}
+        handleTagAction={handleTagAction}
+        tagId={tagState.tagToDelete}
+      />
+      <CreateTagDialog
+        open={dialogs.createTag}
+        onOpenChange={val => setDialogs(prev => ({ ...prev, createTag: val }))}
+        tagState={tagState}
+        setTagState={setTagState}
+        handleTagAction={handleTagAction}
+      />
+      <UPIDonationDialog
+        open={dialogs.upiDonation}
+        onOpenChange={val => setDialogs(prev => ({ ...prev, upiDonation: val }))}
+      />
     </div>
   );
 }

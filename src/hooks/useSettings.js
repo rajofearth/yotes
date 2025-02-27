@@ -1,4 +1,3 @@
-// src/hooks/useSettings.js
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../utils/supabaseClient';
@@ -12,7 +11,7 @@ export const useSettings = () => {
   const showToast = useToast();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState({ logout: false, delete: false, tagDelete: false });
-  const [dialogs, setDialogs] = useState({ deleteAccount: false, deleteTag: false, createTag: false });
+  const [dialogs, setDialogs] = useState({ deleteAccount: false, deleteTag: false, createTag: false,upiDonation: false });
   const [tagState, setTagState] = useState({ editingId: null, editingName: '', newName: '', tagToDelete: null });
 
   useEffect(() => {
