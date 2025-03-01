@@ -1,4 +1,3 @@
-// src/contexts/GoogleDriveContext.jsx
 import { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import { supabase } from '../utils/supabaseClient';
 import { useToast } from './ToastContext';
@@ -49,10 +48,26 @@ export function GoogleDriveProvider({ children }) {
         expires_at: Math.floor(Date.now() / 1000) + expires_in
       };
       await setInDB('sessions', 'session', updatedSession);
+
+      // Update Supabase session if necessary
+      const { error: updateError } = await supabase.auth.updateSession({
+        provider_token,
+        expires_in,
+        expires_at: Math.floor(Date.now() / 1000) + expires_in
+      });
+      if (updateError) {
+        console.error('Failed to update Supabase session:', updateError);
+      }
+
       scheduleTokenRefresh(expires_in);
     } catch (err) {
-      console.error('Refresh failed:', err);
-      showToast('Google Drive access expired. Please sign in again.', 'error');
+      if (err.message.includes('No refresh token available')) {
+        showToast('No refresh token available. Please sign in again.', 'error');
+      } else if (err.message.includes('invalid_grant')) {
+        showToast('Google Drive access revoked. Please sign in again.', 'error');
+      } else {
+        showToast('Google Drive access expired. Please sign in again.', 'error');
+      }
       setAccessToken(null);
       setFolderIds(null);
       await supabase.auth.signOut();
@@ -107,6 +122,9 @@ export function GoogleDriveProvider({ children }) {
 
   useEffect(() => {
     initializeGoogleDrive();
+    return () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+    };
   }, []);
 
   const value = {

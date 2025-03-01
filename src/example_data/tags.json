@@ -1,0 +1,14 @@
+{
+    "tags": [
+        { "id": 1, "name": "Work", "color": "text-blue-500" },
+        { "id": 2, "name": "Personal", "color": "text-purple-500" },
+        { "id": 3, "name": "Ideas", "color": "text-green-500" },
+        { "id": 4, "name": "Design", "color": "text-purple-500" },
+        { "id": 5, "name": "Research", "color": "text-yellow-500" },
+        { "id": 6, "name": "Technical", "color": "text-green-500" },
+        { "id": 7, "name": "Marketing", "color": "text-pink-500" },
+        { "id": 8, "name": "Technical", "color": "text-orange-500" },
+        { "id": 9, "name": "Shopping", "color": "text-yellow-500" },
+        { "id": 10, "name": "Learning", "color": "text-pink-500" }
+    ]
+} 
