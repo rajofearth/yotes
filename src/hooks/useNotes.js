@@ -1,4 +1,3 @@
-// src/hooks/useGoogleDrive.js
 import { useState, useEffect, useCallback, useRef, useContext } from 'react';
 import { useGoogleDrive } from '../contexts/GoogleDriveContext';
 import { useToast } from '../contexts/ToastContext';
@@ -10,8 +9,8 @@ import {
   getSyncQueue,
   clearSyncItem,
 } from '../utils/indexedDB';
-import { supabase } from '../utils/supabaseClient'; // Import Supabase client
-import { GoogleDriveAPI } from '../utils/googleDrive'; // Import GoogleDriveAPI
+import { supabase } from '../utils/supabaseClient';
+import { GoogleDriveAPI } from '../utils/googleDrive';
 
 const CACHE_DURATION = 15 * 60 * 1000; // 15 minutes
 
@@ -131,6 +130,7 @@ export function useNotes() {
     const refreshInterval = setInterval(refreshAccessToken, 30 * 60 * 1000);
     return () => clearInterval(refreshInterval);
   }, [refreshAccessToken]);
+
   const loadInitialData = useCallback(async () => {
     setLoadingState({ progress: 10, message: 'Checking local notes...' });
     //console.log('Loading initial data from IndexedDB...');
@@ -367,11 +367,15 @@ export function useNotes() {
     },
     [notes, showToast, syncToGoogleDrive, tags]
   );
-
+  
   const createTag = useCallback(
     async (tagData) => {
       try {
-        const newTag = { id: crypto.randomUUID(), name: tagData.name };
+        const newTag = {
+          id: crypto.randomUUID(),
+          name: tagData.name,
+          color: tagData.color || 'bg-gray-500/20 text-gray-500' // Fallback color
+        };
         const updatedTags = [...tags, newTag];
         setTags(updatedTags);
         await setInDB('tags', 'tags_data', updatedTags);
@@ -390,10 +394,22 @@ export function useNotes() {
   const updateTag = useCallback(
     async (tagId, updates) => {
       try {
-        const updatedTags = tags.map((t) => (t.id === tagId ? { ...t, ...updates } : t));
+        const existingTag = tags.find(t => t.id === tagId);
+        if (!existingTag) throw new Error('Tag not found');
+
+        const updatedTag = {
+          ...existingTag, // Preserve existing properties like id
+          name: updates.name || existingTag.name, // Update name if provided, else keep existing
+          color: updates.color || existingTag.color // Update color if provided, else keep existing
+        };
+
+        const updatedTags = tags.map(t =>
+          t.id === tagId ? updatedTag : t
+        );
+
         setTags(updatedTags);
         await setInDB('tags', 'tags_data', updatedTags);
-        await addToSyncQueue({ type: 'updateTag', data: { tagId, updates } });
+        await addToSyncQueue({ type: 'updateTag', data: { tagId, ...updatedTag } });
         showToast('Tag updated', 'success');
         await syncToGoogleDrive(updatedTags, notes);
       } catch (err) {

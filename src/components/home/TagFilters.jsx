@@ -53,8 +53,11 @@ export const TagFilters = ({ onFilterChange }) => {
                 {[{ id: 'all', name: 'All', color: 'bg-overlay/20 text-text-primary' }, ...tags].map((tag) => (
                     <Button
                         key={tag.id}
-                        variant="ghost"
-                        className={`h-7 rounded-full px-2.5 sm:px-3 text-xs font-medium whitespace-nowrap hover:bg-overlay/10 ${selectedTags.includes(tag.id) ? 'bg-overlay/10' : ''}`}
+                        className={`
+                            h-7 rounded-full px-2.5 sm:px-3 text-xs font-medium whitespace-nowrap
+                            ${tag.color || 'bg-gray-500/20 text-gray-500'}
+                            ${selectedTags.includes(tag.id) ? '' : 'opacity-50'}
+                        `}
                         onClick={() => handleCheckboxChange(tag.id)}
                     >
                         {tag.name}
@@ -80,7 +83,9 @@ export const TagFilters = ({ onFilterChange }) => {
                             checked={selectedTags.includes(tag.id)}
                             onCheckedChange={() => handleCheckboxChange(tag.id)}
                         >
-                            <div className={`w-2 h-2 rounded-full bg-blue-500 mr-2`}></div>
+                            <span className={tag.color?.split(' ').find(c => c.startsWith('text-')) || 'text-gray-500'}>
+                                <div className="w-2 h-2 rounded-full bg-current mr-2"></div>
+                            </span>
                             {tag.name}
                         </DropdownMenuCheckboxItem>
                     ))}

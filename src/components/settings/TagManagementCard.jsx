@@ -1,8 +1,9 @@
+// src/components/settings/TagManagementCard.jsx
 import { useRef, useEffect, useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/card';
 import { Button } from '../ui/button';
-import { Input } from '../ui/input';
-import { Edit, Plus, Save, X, Trash2 } from 'lucide-react';
+import { Plus, Trash2, Pencil } from 'lucide-react';
+import { EditTagDialog } from './EditTagDialog';
 
 export const TagManagementCard = ({
   tags,
@@ -11,30 +12,8 @@ export const TagManagementCard = ({
   setDialogs,
   handleTagAction,
 }) => {
-  const inputRef = useRef(null);
-  const cardRef = useRef(null);
   const scrollContainerRef = useRef(null);
   const [gradients, setGradients] = useState({ top: false, bottom: false });
-
-  useEffect(() => {
-    const handleClickOutside = event => {
-      if (
-        tagState.editingId &&
-        cardRef.current &&
-        !cardRef.current.contains(event.target)
-      ) {
-        setTagState(prev => ({ ...prev, editingId: null, editingName: '' }));
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [tagState.editingId, setTagState]);
-
-  useEffect(() => {
-    if (tagState.editingId && inputRef.current) {
-      inputRef.current.focus();
-    }
-  }, [tagState.editingId]);
 
   useEffect(() => {
     const container = scrollContainerRef.current;
@@ -52,29 +31,12 @@ export const TagManagementCard = ({
     }
   }, [tags]);
 
-  const cancelEdit = () => {
-    setTagState(prev => ({ ...prev, editingId: null, editingName: '' }));
-  };
-
-  const handleSave = tagId => {
-    if (tagState.editingName.trim()) {
-      handleTagAction('update', { id: tagId, name: tagState.editingName });
-    } else {
-      cancelEdit();
-    }
-  };
-
-  const handleKeyDown = (e, tagId) => {
-    if (e.key === 'Enter') handleSave(tagId);
-    if (e.key === 'Escape') cancelEdit();
-  };
-
   const maxVisibleTags = 4;
   const tagHeight = 38;
   const maxHeight = `${maxVisibleTags * tagHeight}px`;
 
   return (
-    <Card ref={cardRef} className="bg-overlay/5 border-overlay/10">
+    <Card className="bg-overlay/5 border-overlay/10">
       <CardHeader className="grid grid-cols-[1fr_auto] items-center gap-4">
         <div className="flex flex-col">
           <CardTitle>Tag Management</CardTitle>
@@ -94,7 +56,7 @@ export const TagManagementCard = ({
           <div className="relative">
             <ul
               ref={scrollContainerRef}
-              className="space-y-2 overflow-y-auto pr-2 scrollbar-hide rounded"
+              className="space-y-2 overflow-y-auto pr-2 pl-2 scrollbar-hide rounded"
               style={{ maxHeight }}
             >
               {tags.map(tag => (
@@ -102,70 +64,38 @@ export const TagManagementCard = ({
                   key={tag.id}
                   className="flex items-center gap-2 bg-overlay/10 rounded pl-2 py-1 transition-colors hover:bg-overlay/20"
                 >
-                  {tagState.editingId === tag.id ? (
-                    <>
-                      <Input
-                        ref={inputRef}
-                        value={tagState.editingName}
-                        onChange={e =>
-                          setTagState(prev => ({
-                            ...prev,
-                            editingName: e.target.value,
-                          }))
-                        }
-                        onKeyDown={e => handleKeyDown(e, tag.id)}
-                        className="flex-1 bg-overlay/5 border-overlay/10 h-8 text-sm"
-                        placeholder="Enter tag name"
-                      />
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleSave(tag.id)}
-                        className="h-8 w-8 hover:bg-overlay/10"
-                      >
-                        <Save className="h-4 w-4 text-green-500" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={cancelEdit}
-                        className="h-8 w-8 hover:bg-overlay/10"
-                      >
-                        <X className="h-4 w-4 text-gray-500" />
-                      </Button>
-                    </>
-                  ) : (
-                    <>
-                      <span className="flex-1 text-sm text-text-primary/80 truncate">
-                        {tag.name}
-                      </span>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() =>
-                          setTagState(prev => ({
-                            ...prev,
-                            editingId: tag.id,
-                            editingName: tag.name,
-                          }))
-                        }
-                        className="h-8 w-8 hover:bg-overlay/10"
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => {
-                          setTagState(prev => ({ ...prev, tagToDelete: tag.id }));
-                          setDialogs(prev => ({ ...prev, deleteTag: true }));
-                        }}
-                        className="h-8 w-8 hover:bg-overlay/10"
-                      >
-                        <Trash2 className="h-4 w-4 text-red-500" />
-                      </Button>
-                    </>
-                  )}
+                  <div className="flex items-center gap-2 flex-1">
+                    <span className={tag.color?.split(' ').find(c => c.startsWith('text-')) || 'text-gray-500'}>
+                      <div className="w-3 h-3 rounded-full bg-current"></div>
+                    </span>
+                    <span className="text-sm text-text-primary/80 truncate">{tag.name}</span>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() =>
+                      setTagState(prev => ({
+                        ...prev,
+                        editingId: tag.id,
+                        editingName: tag.name,
+                        editingColor: tag.color
+                      }))
+                    }
+                    className="h-8 w-8 hover:bg-overlay/10"
+                  >
+                    <Pencil className="h-4 w-4 text-icon-primary hover:text-text-primary transition-colors" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => {
+                      setTagState(prev => ({ ...prev, tagToDelete: tag.id }));
+                      setDialogs(prev => ({ ...prev, deleteTag: true }));
+                    }}
+                    className="h-8 w-8 hover:bg-overlay/10"
+                  >
+                    <Trash2 className="h-4 w-4 text-red-500" />
+                  </Button>
                 </li>
               ))}
             </ul>
@@ -180,6 +110,14 @@ export const TagManagementCard = ({
           <p className="text-sm text-text-primary/60">No tags created yet.</p>
         )}
       </CardContent>
+      <EditTagDialog
+        open={!!tagState.editingId}
+        onOpenChange={(open) => !open && setTagState(prev => ({ ...prev, editingId: null }))}
+        tagState={tagState}
+        setTagState={setTagState}
+        handleTagAction={handleTagAction}
+        tag={tags.find(t => t.id === tagState.editingId) || {}}
+      />
     </Card>
   );
 };

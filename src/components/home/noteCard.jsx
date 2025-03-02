@@ -119,7 +119,7 @@ export const NoteCard = ({ note, refreshNotes }) => {
                             return tag ? (
                                 <span
                                     key={`${note.id}-tag-${tagId}-${index}`}
-                                    className="inline-flex items-center px-1 py-0.5 rounded text-xs bg-overlay/10 text-text-primary/60"
+                                    className={`inline-flex items-center px-1 py-0.5 rounded text-xs ${tag.color || 'bg-gray-500/20 text-gray-500'}`}
                                 >
                                     {tag.name}
                                 </span>
