@@ -3,21 +3,17 @@ import { groupNotesByDate } from '../components/home/grpNotesByDate';
 import { NotesSection } from '../components/home/notesSection';
 import { TagFilters } from '../components/home/TagFilters';
 import NavBar from '../components/home/navBar';
-import { useNotes } from '../hooks/useNotes';
-import { useGoogleDrive } from '../contexts/GoogleDriveContext';
+import { useNotes } from '../contexts/NotesContext';
 import { useLocation } from 'react-router-dom';
 import { applyFiltersAndSearch, debounce } from '../utils/noteFilters';
-import ProgressBar from '../components/ProgressBar';
 import { ErrorState } from '../components/home/ErrorState';
 
 export default function Home() {
-    const { isLoading: isDriveLoading } = useGoogleDrive();
-    const { notes, tags, isLoading: isNotesLoading, error, refreshData, loadingProgress } = useNotes();
+    const { notes, tags, error, refreshData } = useNotes();
     const location = useLocation();
     const [filteredNotes, setFilteredNotes] = useState(notes);
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedTagIds, setSelectedTagIds] = useState(['all']);
-    const [loadingState, setLoadingState] = useState({ progress: 0, message: 'Initializing...' });
 
     useEffect(() => {
         if (location.state?.refresh) refreshData();
@@ -28,10 +24,6 @@ export default function Home() {
     const handleFilterChange = tagIds => setSelectedTagIds(tagIds.length === 0 ? ['all'] : tagIds);
 
     const groupedNotes = useMemo(() => groupNotesByDate(filteredNotes), [filteredNotes]);
-
-    if (isDriveLoading || isNotesLoading) {
-        return <ProgressBar progress={loadingState.progress} message={loadingState.message} />;
-    }
 
     if (error) {
         return <ErrorState error={error} />;

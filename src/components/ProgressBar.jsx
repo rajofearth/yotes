@@ -3,7 +3,7 @@ import { TextShimmer } from './ui/text-shimmer';
 
 const ProgressBar = ({ progress, message }) => {
   return (
-    <div className="w-full max-w-lg mx-auto p-6 flex flex-col items-center">
+    <div className="w-full max-w-lg mx-auto p-6 flex flex-col justify-center items-center">
       {/* Yotes Branding */}
           <TextShimmer className='text-3xl md:text-4xl font-bold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400' duration={1}>
               Yotes

@@ -1,13 +1,13 @@
-import { useState, useEffect, useCallback, useRef, useContext } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useGoogleDrive } from '../contexts/GoogleDriveContext';
 import { useToast } from '../contexts/ToastContext';
 import {
-  openDB,
-  getFromDB,
-  setInDB,
-  addToSyncQueue,
-  getSyncQueue,
-  clearSyncItem,
+    openDB,
+    getFromDB,
+    setInDB,
+    addToSyncQueue,
+    getSyncQueue,
+    clearSyncItem,
 } from '../utils/indexedDB';
 import { supabase } from '../utils/supabaseClient';
 import { GoogleDriveAPI } from '../utils/googleDrive';
@@ -15,212 +15,177 @@ import { GoogleDriveAPI } from '../utils/googleDrive';
 const CACHE_DURATION = 15 * 60 * 1000; // 15 minutes
 
 export function useNotes() {
-  const { driveApi, folderIds, isLoading: isDriveLoading } = useGoogleDrive();
-  const [notes, setNotes] = useState([]);
-  const [tags, setTags] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [isInitialSync, setIsInitialSync] = useState(true);
-  const [error, setError] = useState(null);
-  const [loadingState, setLoadingState] = useState({ progress: 0, message: 'Initializing...' });
-  const showToast = useToast();
-  const hasLoadedFromDrive = useRef(false);
+    const { driveApi, folderIds, isLoading: isDriveLoading } = useGoogleDrive();
+    const [notes, setNotes] = useState([]);
+    const [tags, setTags] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [isSyncing, setIsSyncing] = useState(false);
+    const [isInitialSync, setIsInitialSync] = useState(true);
+    const [error, setError] = useState(null);
+    const [loadingState, setLoadingState] = useState({ progress: 0, message: 'Initializing...' });
+    const showToastRaw = useToast();
+    const hasLoadedFromDrive = useRef(false);
+    const [googleDriveApi, setGoogleDriveApi] = useState(null);
+    const [isRefreshingToken, setIsRefreshingToken] = useState(false);
 
-  const [googleDriveApi, setGoogleDriveApi] = useState(null); // State for GoogleDriveAPI
-  const [isRefreshingToken, setIsRefreshingToken] = useState(false); // State to prevent concurrent refreshes
+    // Memoize showToast to prevent useEffect loops
+    const showToast = useMemo(() => showToastRaw, []);
 
-  const shouldRefreshCache = useCallback(async (storeName) => {
-    try {
-      const timestamp = await getFromDB(storeName, `${storeName}_timestamp`);
-      return !timestamp || Date.now() - timestamp > CACHE_DURATION;
-    } catch (err) {
-      console.error(`Failed to check cache for ${storeName}:`, err);
-      return true;
-    }
-  }, []);
+    const shouldRefreshCache = useCallback(async (storeName) => {
+        try {
+            const timestamp = await getFromDB(storeName, `${storeName}_timestamp`);
+            return !timestamp || Date.now() - timestamp > CACHE_DURATION;
+        } catch (err) {
+            console.error(`Failed to check cache for ${storeName}:`, err);
+            return true;
+        }
+    }, []);
 
-  const refreshAccessToken = useCallback(async () => {
-    if (isRefreshingToken) {
-      console.log('Token refresh already in progress');
-      return;
-    }
-
-    setIsRefreshingToken(true);
-    try {
-      const { data: { session }, error } = await supabase.auth.getSession();
-      if (error) {
-        console.error('Error getting session:', error);
-        showToast(`Failed to refresh session: ${error.message}`, 'error');
-        return;
-      }
-
-      const refreshToken = session?.refresh_token;
-
-      if (!refreshToken) {
-        console.warn('No refresh token available.');
-        // Potentially force re-login here if refresh token is missing.
-        return;
-      }
-
-      const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-      const clientSecret = import.meta.env.VITE_GOOGLE_CLIENT_SECRET;
-
-      const googleDrive = new GoogleDriveAPI(''); // Create a new instance to use the refresh method
-      const { provider_token, expires_in } = await googleDrive.refreshProviderToken(
-        refreshToken,
-        clientId,
-        clientSecret
-      );
-
-      // Update Supabase session with the new access token.  This is CRITICAL.
-      const { error: updateError } = await supabase.auth.updateSession({
-        provider_token: provider_token,
-        expires_in: expires_in
-      });
-
-      if (updateError) {
-        console.error('Failed to update Supabase session:', updateError);
-        showToast(`Failed to update session: ${updateError.message}`, 'error');
-        return;
-      }
-
-      // Optimistically update local state
-      setGoogleDriveApi(new GoogleDriveAPI(provider_token));
-      showToast('Access token refreshed!', 'success');
-      console.log('Access token refreshed successfully.');
-
-    } catch (err) {
-      console.error('Token refresh failed:', err);
-      showToast(`Token refresh failed: ${err.message}`, 'error');
-    } finally {
-      setIsRefreshingToken(false);
-    }
-  }, [showToast]);
-
-  useEffect(() => {
-    const initializeGoogleDriveApi = async () => {
-        setIsLoading(true); // Start loading
+    const refreshAccessToken = useCallback(async () => {
+        if (isRefreshingToken) {
+            console.log('Token refresh already in progress');
+            return;
+        }
+        setIsRefreshingToken(true);
         try {
             const { data: { session }, error } = await supabase.auth.getSession();
-            if (error) {
-                console.error('Error getting session:', error);
-                showToast(`Failed to get session: ${error.message}`, 'error');
-                return;
-            }
-
-            if (session?.provider_token) {
-                console.log("Session provider token: ", session.provider_token);
-                setGoogleDriveApi(new GoogleDriveAPI(session.provider_token));
-            } else {
-                console.log("No provider token found in session.");
-            }
-        } catch (error) {
-            console.error("Error initializing Google Drive API:", error);
-            showToast(`Failed to initialize Google Drive API: ${error.message}`, 'error');
+            if (error) throw error;
+            const refreshToken = session?.refresh_token;
+            if (!refreshToken) throw new Error('No refresh token available');
+            const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+            const clientSecret = import.meta.env.VITE_GOOGLE_CLIENT_SECRET;
+            const googleDrive = new GoogleDriveAPI('');
+            const { provider_token, expires_in } = await googleDrive.refreshProviderToken(refreshToken, clientId, clientSecret);
+            const { error: updateError } = await supabase.auth.updateSession({ provider_token, expires_in });
+            if (updateError) throw updateError;
+            setGoogleDriveApi(new GoogleDriveAPI(provider_token));
+            showToast('Access token refreshed!', 'success');
+        } catch (err) {
+            console.error('Token refresh failed:', err);
+            showToast(`Token refresh failed: ${err.message}`, 'error');
         } finally {
-            setIsLoading(false); // End loading
+            setIsRefreshingToken(false);
         }
-    };
+    }, [showToast]);
 
-    initializeGoogleDriveApi();
-}, [showToast]);
+    useEffect(() => {
+        const initializeGoogleDriveApi = async () => {
+            setIsLoading(true);
+            try {
+                const { data: { session }, error } = await supabase.auth.getSession();
+                if (error) throw error;
+                if (session?.provider_token) {
+                    console.log('Session provider token:', session.provider_token);
+                    setGoogleDriveApi(new GoogleDriveAPI(session.provider_token));
+                } else {
+                    console.log('No provider token found in session.');
+                }
+            } catch (error) {
+                console.error('Error initializing Google Drive API:', error);
+                showToast(`Failed to initialize Google Drive API: ${error.message}`, 'error');
+            }
+        };
+        initializeGoogleDriveApi();
+    }, [showToast]);
 
-  useEffect(() => {
-    // Refresh token periodically (e.g., every 30 minutes)
-    const refreshInterval = setInterval(refreshAccessToken, 30 * 60 * 1000);
-    return () => clearInterval(refreshInterval);
-  }, [refreshAccessToken]);
+    useEffect(() => {
+        const refreshInterval = setInterval(refreshAccessToken, 30 * 60 * 1000);
+        return () => clearInterval(refreshInterval);
+    }, [refreshAccessToken]);
 
-  const loadInitialData = useCallback(async () => {
-    setLoadingState({ progress: 10, message: 'Checking local notes...' });
-    //console.log('Loading initial data from IndexedDB...');
-    try {
-      const cachedNotes = (await getFromDB('notes', 'notes_data')) || [];
-      const cachedTags = (await getFromDB('tags', 'tags_data')) || [];
-      setNotes(cachedNotes);
-      setTags(cachedTags);
-      //console.log('Initial data loaded:', { notes: cachedNotes.length, tags: cachedTags.length });
-      setLoadingState({ progress: 30, message: 'Local data loaded' });
-      return { notes: cachedNotes, tags: cachedTags };
-    } catch (err) {
-      console.error('Failed to load initial data from IndexedDB:', err);
-      setError(err);
-      setLoadingState({ progress: 100, message: 'Error loading local data' });
-      throw err;
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  const loadData = useCallback(async (force = false) => {
-    if (!googleDriveApi || !folderIds?.notes || !folderIds?.tags) {
-      //console.log('Drive not ready, skipping loadData');
-      setLoadingState({ progress: 40, message: 'Waiting for Google Drive...' });
-      return;
-    }
-
-    setIsSyncing(true);
-    setError(null);
-    setLoadingState({ progress: 40, message: 'Connecting to Google Drive...' });
-    //console.log('Starting loadData...', { force });
-
-    try {
-      const notesRefreshNeeded = force || await shouldRefreshCache('notes');
-      const tagsRefreshNeeded = force || await shouldRefreshCache('tags');
-
-      let tagsData = tags;
-      if (tagsRefreshNeeded) {
-        setLoadingState({ progress: 60, message: 'Loading tags...' });
-        //console.log('Fetching tags from Google Drive...');
-        const { files } = await googleDriveApi.listFiles(folderIds.tags);
-        const tagsFile = files.find((f) => f.name === 'tags.json');
-        if (tagsFile) {
-          const [tagsBlob] = await googleDriveApi.downloadFiles([tagsFile.id]);
-          tagsData = tagsBlob ? JSON.parse(await tagsBlob.text()) : [];
-        } else {
-          tagsData = [];
+    const loadInitialData = useCallback(async () => {
+        console.log('loadInitialData: Starting');
+        setLoadingState({ progress: 10, message: 'Checking local notes...' });
+        try {
+            const cachedNotes = (await getFromDB('notes', 'notes_data')) || [];
+            const cachedTags = (await getFromDB('tags', 'tags_data')) || [];
+            setNotes(cachedNotes);
+            setTags(cachedTags);
+            setLoadingState({ progress: 30, message: 'Local data loaded' });
+            console.log('loadInitialData: Complete');
+            return { notes: cachedNotes, tags: cachedTags };
+        } catch (err) {
+            console.error('Failed to load initial data from IndexedDB:', err);
+            setError(err);
+            setLoadingState({ progress: 100, message: 'Error loading local data' });
+            throw err;
         }
-        setTags(tagsData);
-        await setInDB('tags', 'tags_data', tagsData);
-        await setInDB('tags', 'tags_timestamp', Date.now());
-        //console.log('Tags loaded and saved:', tagsData.length);
-        setLoadingState({ progress: 80, message: 'Tags loaded' });
-      }
+    }, []);
 
-      let notesData = notes;
-      if (notesRefreshNeeded) {
-        setLoadingState({ progress: 90, message: 'Loading notes...' });
-        //console.log('Fetching notes from Google Drive...');
-        const { files } = await googleDriveApi.listFiles(folderIds.notes);
-        if (files.length) {
-          const notesBlobs = await googleDriveApi.downloadFiles(files.map((f) => f.id));
-          const validBlobs = notesBlobs.filter((blob) => blob);
-          notesData = (await Promise.all(
-            validBlobs.map((blob) => blob.text().then(JSON.parse).catch(() => null))
-          ))
-            .filter((n) => n?.id && n.createdAt && n.updatedAt)
-            .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
-        } else {
-          notesData = [];
+    const loadData = useCallback(async (force = false) => {
+        if (!googleDriveApi || !folderIds?.notes || !folderIds?.tags) {
+            console.log('loadData: Google Drive not ready');
+            if (isInitialSync) setLoadingState({ progress: 40, message: 'Waiting for Google Drive...' });
+            return;
         }
-        setNotes(notesData);
-        await setInDB('notes', 'notes_data', notesData);
-        await setInDB('notes', 'notes_timestamp', Date.now());
-        //console.log('Notes loaded and saved:', notesData.length);
-      }
-      setLoadingState({ progress: 100, message: 'All set!' });
-      await new Promise((resolve) => setTimeout(resolve, 500));
-    } catch (err) {
-      console.error('Error in loadData:', err);
-      setError(err);
-      showToast(`Failed to load data: ${err.message}`, 'error');
-      setLoadingState({ progress: 100, message: 'Error syncing with Drive' });
-    } finally {
-      //console.log('loadData complete, setting isSyncing to false');
-      setIsSyncing(false);
-      setIsInitialSync(false);
-    }
-  }, [googleDriveApi, folderIds, notes, tags, showToast, shouldRefreshCache]);
+
+        setIsSyncing(true);
+        setError(null);
+        console.log('loadData: Starting sync');
+        if (isInitialSync) setLoadingState({ progress: 40, message: 'Connecting to Google Drive...' });
+
+        try {
+            const notesRefreshNeeded = force || (await shouldRefreshCache('notes'));
+            const tagsRefreshNeeded = force || (await shouldRefreshCache('tags'));
+
+            let tagsData = tags;
+            if (tagsRefreshNeeded) {
+                console.log('loadData: Loading tags');
+                if (isInitialSync) setLoadingState({ progress: 60, message: 'Loading tags...' });
+                const { files } = await googleDriveApi.listFiles(folderIds.tags);
+                const tagsFile = files.find((f) => f.name === 'tags.json');
+                if (tagsFile) {
+                    const [tagsBlob] = await googleDriveApi.downloadFiles([tagsFile.id]);
+                    tagsData = tagsBlob ? JSON.parse(await tagsBlob.text()) : [];
+                } else {
+                    tagsData = [];
+                }
+                setTags(tagsData);
+                await setInDB('tags', 'tags_data', tagsData);
+                await setInDB('tags', 'tags_timestamp', Date.now());
+                if (isInitialSync) setLoadingState({ progress: 80, message: 'Tags loaded' });
+            }
+
+            let notesData = notes;
+            if (notesRefreshNeeded) {
+                console.log('loadData: Loading notes');
+                if (isInitialSync) setLoadingState({ progress: 90, message: 'Loading notes...' });
+                const { files } = await googleDriveApi.listFiles(folderIds.notes);
+                if (files.length) {
+                    const notesBlobs = await googleDriveApi.downloadFiles(files.map((f) => f.id));
+                    const validBlobs = notesBlobs.filter((blob) => blob);
+                    notesData = (await Promise.all(
+                        validBlobs.map((blob) => blob.text().then(JSON.parse).catch(() => null))
+                    ))
+                        .filter((n) => n?.id && n.createdAt && n.updatedAt)
+                        .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+                } else {
+                    notesData = [];
+                }
+                setNotes(notesData);
+                await setInDB('notes', 'notes_data', notesData);
+                await setInDB('notes', 'notes_timestamp', Date.now());
+            }
+
+            if (isInitialSync) {
+                console.log('loadData: Finishing initial sync');
+                setLoadingState({ progress: 100, message: 'All set!' });
+                await new Promise((resolve) => setTimeout(resolve, 500));
+            }
+            console.log('loadData: Sync complete');
+        } catch (err) {
+            console.error('Error in loadData:', err);
+            setError(err);
+            showToast(`Failed to load data: ${err.message}`, 'error');
+            if (isInitialSync) setLoadingState({ progress: 100, message: 'Error syncing with Drive' });
+        } finally {
+            setIsSyncing(false);
+            if (isInitialSync) {
+                setIsInitialSync(false);
+                setIsLoading(false);
+            }
+        }
+    }, [googleDriveApi, folderIds, notes, tags, shouldRefreshCache, isInitialSync, showToast]);
 
   const syncToGoogleDrive = useCallback(async (currentTags = tags, currentNotes = notes) => {
     if (!googleDriveApi || !folderIds) {
@@ -231,10 +196,8 @@ export function useNotes() {
     setIsSyncing(true);
     try {
       const queue = await getSyncQueue();
-      //console.log('Syncing to Google Drive with queue:', queue);
       for (const operation of queue) {
         const { type, data } = operation;
-        //console.log(`Processing sync operation: ${type}`, data);
         switch (type) {
           case 'createNote': {
             const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
@@ -268,7 +231,6 @@ export function useNotes() {
             const oldFile = files.find((f) => f.name === 'tags.json');
             if (oldFile) await googleDriveApi.deleteFile(oldFile.id);
             await googleDriveApi.uploadFile(new File([blob], 'tags.json'), folderIds.tags);
-            //console.log('Tags synced to Drive:', currentTags);
             break;
           }
           default:
@@ -276,6 +238,8 @@ export function useNotes() {
         }
         await clearSyncItem(operation.id);
       }
+      // No progress bar update here; only toast for success
+      // showToast('Synced successfully', 'success'); // Uncomment if desired
     } catch (err) {
       console.error('Sync failed:', err);
       showToast('Failed to sync with Google Drive. Changes saved locally.', 'error');
@@ -284,27 +248,25 @@ export function useNotes() {
     }
   }, [googleDriveApi, folderIds, tags, notes, showToast]);
 
-  useEffect(() => {
-    //console.log('Running initial load useEffect');
-    loadInitialData().catch((err) => {
-      console.error('Initial load failed:', err);
-      showToast('Failed to load initial data', 'error');
-    });
-  }, [loadInitialData, showToast]);
+useEffect(() => {
+        console.log('useNotes: Loading initial data');
+        loadInitialData().catch((err) => {
+            console.error('Initial load failed:', err);
+        });
+    }, [loadInitialData]);
 
-  useEffect(() => {
-    if (!isDriveLoading && googleDriveApi && folderIds && !hasLoadedFromDrive.current) {
-      setLoadingState({ progress: 40, message: 'Checking local notes...' });
-      //console.log('Drive ready, calling loadData');
-      loadData();
-      hasLoadedFromDrive.current = true;
-    }
-  }, [isDriveLoading, googleDriveApi, folderIds, loadData]);
+    useEffect(() => {
+        if (!isDriveLoading && googleDriveApi && folderIds && !hasLoadedFromDrive.current) {
+            console.log('useNotes: Loading from Drive');
+            loadData();
+            hasLoadedFromDrive.current = true;
+        }
+    }, [isDriveLoading, googleDriveApi, folderIds, loadData]);
 
-  useEffect(() => {
-    const interval = setInterval(() => syncToGoogleDrive(tags, notes), 5000);
-    return () => clearInterval(interval);
-  }, [syncToGoogleDrive, tags, notes]);
+    useEffect(() => {
+        const interval = setInterval(() => syncToGoogleDrive(tags, notes), 5000);
+        return () => clearInterval(interval);
+    }, [syncToGoogleDrive, tags, notes]);
 
   const createNote = useCallback(
     async (noteData) => {
@@ -367,14 +329,14 @@ export function useNotes() {
     },
     [notes, showToast, syncToGoogleDrive, tags]
   );
-  
+
   const createTag = useCallback(
     async (tagData) => {
       try {
         const newTag = {
           id: crypto.randomUUID(),
           name: tagData.name,
-          color: tagData.color || 'bg-gray-500/20 text-gray-500' // Fallback color
+          color: tagData.color || 'bg-gray-500/20 text-gray-500',
         };
         const updatedTags = [...tags, newTag];
         setTags(updatedTags);
@@ -394,19 +356,14 @@ export function useNotes() {
   const updateTag = useCallback(
     async (tagId, updates) => {
       try {
-        const existingTag = tags.find(t => t.id === tagId);
+        const existingTag = tags.find((t) => t.id === tagId);
         if (!existingTag) throw new Error('Tag not found');
-
         const updatedTag = {
-          ...existingTag, // Preserve existing properties like id
-          name: updates.name || existingTag.name, // Update name if provided, else keep existing
-          color: updates.color || existingTag.color // Update color if provided, else keep existing
+          ...existingTag,
+          name: updates.name || existingTag.name,
+          color: updates.color || existingTag.color,
         };
-
-        const updatedTags = tags.map(t =>
-          t.id === tagId ? updatedTag : t
-        );
-
+        const updatedTags = tags.map((t) => (t.id === tagId ? updatedTag : t));
         setTags(updatedTags);
         await setInDB('tags', 'tags_data', updatedTags);
         await addToSyncQueue({ type: 'updateTag', data: { tagId, ...updatedTag } });
@@ -443,26 +400,26 @@ export function useNotes() {
     [notes, tags, showToast, syncToGoogleDrive]
   );
 
-  const refreshData = useCallback(() => {
-    hasLoadedFromDrive.current = false;
-    loadData(true);
-  }, [loadData]);
+const refreshData = useCallback(() => {
+        hasLoadedFromDrive.current = false;
+        loadData(true);
+    }, [loadData]);
 
-  return {
-    notes,
-    tags,
-    isLoading,
-    isSyncing,
-    isInitialSync,
-    error,
-    createNote,
-    updateNote,
-    deleteNote,
-    createTag,
-    updateTag,
-    deleteTag,
-    refreshData,
-    loadingState,
-    googleDriveApi,
-  };
+    return {
+        notes,
+        tags,
+        isLoading,
+        isSyncing,
+        isInitialSync,
+        error,
+        createNote,
+        updateNote,
+        deleteNote,
+        createTag,
+        updateTag,
+        deleteTag,
+        refreshData,
+        loadingState,
+        googleDriveApi,
+    };
 }
