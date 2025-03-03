@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Analytics } from '@vercel/analytics/react';
 import { supabase } from './utils/supabaseClient';
-import { GoogleDriveProvider, useGoogleDrive } from './contexts/GoogleDriveContext'; // Ensure useGoogleDrive is imported
+import { GoogleDriveProvider, useGoogleDrive } from './contexts/GoogleDriveContext';
 import { ToastProvider } from './contexts/ToastContext';
 import { NotesProvider, useNotes } from './contexts/NotesContext';
 import Home from './pages/home';
@@ -16,94 +16,111 @@ import Settings from './pages/settings';
 import ErrorBoundary from './components/ErrorBoundary';
 import ProgressBar from './components/ProgressBar';
 
-function AppContent({ session, isSignedOut, isLoading, setIsInitialLoad }) {
-    const { isLoading: isDriveLoading } = useGoogleDrive(); // Now correctly imported
-    const { isLoading: isNotesLoading, isSyncing, isInitialSync, error: notesError, loadingState } = useNotes();
+function AppContent({ session, isLoading: isAuthLoading, setIsInitialLoad }) {
+  const { isLoading: isDriveLoading } = useGoogleDrive();
+  const { isLoading: isNotesLoading, isSyncing, isInitialSync, loadingState } = useNotes();
 
-    useEffect(() => {
-        if (!isLoading && !isDriveLoading && !isNotesLoading && !isInitialSync) {
-            console.log('All loading complete, setting isInitialLoad to false');
-            setIsInitialLoad(false);
-        }
-    }, [isLoading, isDriveLoading, isNotesLoading, isInitialSync, setIsInitialLoad]);
-
-    if (isSignedOut) {
-        return <Navigate to="/login" replace />;
+  useEffect(() => {
+    // Set isInitialLoad to false when all initial loading is complete
+    if (!isAuthLoading && !isDriveLoading && !isNotesLoading && !isInitialSync) {
+      console.log('All initial loading complete, setting isInitialLoad to false');
+      setIsInitialLoad(false);
     }
+  }, [isAuthLoading, isDriveLoading, isNotesLoading, isInitialSync, setIsInitialLoad]);
 
-    if (isLoading || isDriveLoading || isNotesLoading || (isSyncing && isInitialSync)) {
-        return <ProgressBar progress={loadingState.progress} message={loadingState.message} />;
-    }
+  // Render Login page if no session exists
+  if (!session && !isAuthLoading) {
+    return (
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="/auth/callback" element={<AuthCallback />} />
+        <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
+    );
+  }
 
-    if (session) {
-        return (
-            <ErrorBoundary
-                fallback={<div>{notesError ? `Error: ${notesError.message}` : 'Something went wrong'}</div>}
-            >
-                <Routes>
-                    <Route path="/" element={<Home />} />
-                    <Route path="/note/edit/:id" element={<EditNote />} />
-                    <Route path="/note/view/:id" element={<ViewNote />} />
-                    <Route path="/section/:id" element={<SectionView />} />
-                    <Route path="/settings" element={<Settings />} />
-                    <Route
-                        path="/login"
-                        element={isSignedOut && !isLoading ? <Login /> : <Navigate to="/" replace />}
-                    />
-                    <Route path="/auth/callback" element={<AuthCallback />} />
-                    <Route path="/create" element={<CreateNote />} />
-                    <Route path="*" element={<Navigate to="/" replace />} />
-                </Routes>
-            </ErrorBoundary>
-        );
-    }
-    return null;
+  // Show ProgressBar during initial loading (auth, drive, or notes sync)
+  if (isAuthLoading || isDriveLoading || (isNotesLoading && isInitialSync)) {
+    return (
+      <ProgressBar
+        progress={isAuthLoading ? 0 : loadingState.progress} // Use 0 during auth, then notes progress
+        message={isAuthLoading ? 'Checking authentication...' : loadingState.message}
+      />
+    );
+  }
+
+  // Render authenticated routes when session exists and initial loading is complete
+  return (
+    <ErrorBoundary fallback={<div>Something went wrong</div>}>
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/note/edit/:id" element={<EditNote />} />
+        <Route path="/note/view/:id" element={<ViewNote />} />
+        <Route path="/section/:id" element={<SectionView />} />
+        <Route path="/settings" element={<Settings />} />
+        <Route path="/create" element={<CreateNote />} />
+        <Route path="/login" element={<Navigate to="/" replace />} />
+        <Route path="/auth/callback" element={<AuthCallback />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </ErrorBoundary>
+  );
 }
 
 function App() {
-    const [session, setSession] = useState(null);
-    const [isLoading, setIsLoading] = useState(true);
-    const [isSignedOut, setIsSignedOut] = useState(false);
-    const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [session, setSession] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
 
-    useEffect(() => {
-        const initializeSession = async () => {
-            const { data: { session }, error } = await supabase.auth.getSession();
-            if (error) console.error('Initial session error:', error);
-            setSession(session);
-            setIsSignedOut(!session);
-            setIsLoading(false);
-        };
-        initializeSession();
+  useEffect(() => {
+    const initializeSession = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error) {
+          console.error('Initial session error:', error);
+          setSession(null);
+        } else {
+          setSession(session);
+        }
+      } catch (err) {
+        console.error('Error fetching session:', err);
+        setSession(null);
+      } finally {
+        setIsLoading(false); // Ensure loading is false after auth check
+      }
+    };
 
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, newSession) => {
-            setSession(newSession);
-            setIsSignedOut(!newSession);
-            if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN') {
-                setIsInitialLoad(true);
-            }
-        });
+    initializeSession();
 
-        return () => subscription.unsubscribe();
-    }, []);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, newSession) => {
+      console.log('Auth state changed:', event);
+      setSession(newSession);
+      if (event === 'SIGNED_IN') {
+        setIsInitialLoad(true); // Reset for initial sync on sign-in
+      } else if (event === 'SIGNED_OUT') {
+        setIsInitialLoad(false);
+      }
+    });
 
-    return (
-        <ToastProvider>
-            <Router>
-                <GoogleDriveProvider>
-                    <NotesProvider>
-                        <AppContent
-                            session={session}
-                            isSignedOut={isSignedOut}
-                            isLoading={isLoading}
-                            setIsInitialLoad={setIsInitialLoad}
-                        />
-                        <Analytics />
-                    </NotesProvider>
-                </GoogleDriveProvider>
-            </Router>
-        </ToastProvider>
-    );
+    return () => subscription.unsubscribe();
+  }, []);
+
+  return (
+    <ToastProvider>
+      <Router>
+        <GoogleDriveProvider session={session}>
+          <NotesProvider session={session}>
+            <AppContent
+              session={session}
+              isLoading={isLoading}
+              setIsInitialLoad={setIsInitialLoad}
+            />
+            <Analytics />
+          </NotesProvider>
+        </GoogleDriveProvider>
+      </Router>
+    </ToastProvider>
+  );
 }
 
 export default App;
