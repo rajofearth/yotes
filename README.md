@@ -21,9 +21,9 @@ Yotes prioritizes user privacy by ensuring all data stays within your Google Dri
 ## Planned Features (TODO)
 
 From Yashraj’s rough TODO list, here’s what’s in the pipeline:
-- [ ] Enhanced edit page UI/UX.
-- [ ] Improved loading indicators with timestamps on note cards.
-- [ ] Tag creation fix for mobile devices.
+- [x] Enhanced edit page UI/UX.
+- [x] Improved loading indicators with timestamps on note cards.
+- [x] Tag creation fix for mobile devices.
 - [ ] Static pages: Homepage, Privacy Policy, and Terms & Conditions.
 - [ ] Caching for account details and offline access.
 - [ ] Export/import functionality.
