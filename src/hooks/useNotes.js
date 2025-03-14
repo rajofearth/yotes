@@ -12,10 +12,37 @@ import {
 import { supabase } from '../utils/supabaseClient';
 import { GoogleDriveAPI } from '../utils/googleDrive';
 
+// Simple event emitter
+class EventEmitter {
+  constructor() {
+    this.listeners = {};
+  }
+
+  on(event, listener) {
+    if (!this.listeners[event]) {
+      this.listeners[event] = [];
+    }
+    this.listeners[event].push(listener);
+  }
+
+  emit(event, ...args) {
+    if (this.listeners[event]) {
+      this.listeners[event].forEach(listener => listener(...args));
+    }
+  }
+
+  off(event, listener) {
+    if (this.listeners[event]) {
+      this.listeners[event] = this.listeners[event].filter(l => l !== listener);
+    }
+  }
+}
+
 const CACHE_DURATION = 15 * 60 * 1000; // 15 minutes
 
 export function useNotes() {
     const { driveApi, folderIds, isLoading: isDriveLoading } = useGoogleDrive();
+    const events = useMemo(() => new EventEmitter(), []);
     const [notes, setNotes] = useState([]);
     const [tags, setTags] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -28,7 +55,6 @@ export function useNotes() {
     const [googleDriveApi, setGoogleDriveApi] = useState(null);
     const [isRefreshingToken, setIsRefreshingToken] = useState(false);
 
-    // Memoize showToast to prevent useEffect loops
     const showToast = useMemo(() => showToastRaw, []);
 
     const shouldRefreshCache = useCallback(async (storeName) => {
@@ -165,6 +191,7 @@ export function useNotes() {
                 setNotes(notesData);
                 await setInDB('notes', 'notes_data', notesData);
                 await setInDB('notes', 'notes_timestamp', Date.now());
+                events.emit('notesUpdated'); // Emit event after IndexedDB update
             }
 
             if (isInitialSync) {
@@ -185,70 +212,68 @@ export function useNotes() {
                 setIsLoading(false);
             }
         }
-    }, [googleDriveApi, folderIds, notes, tags, shouldRefreshCache, isInitialSync, showToast]);
+    }, [googleDriveApi, folderIds, notes, tags, shouldRefreshCache, isInitialSync, showToast, events]);
 
-  const syncToGoogleDrive = useCallback(async (currentTags = tags, currentNotes = notes) => {
-    if (!googleDriveApi || !folderIds) {
-      console.log('Drive not available, skipping sync');
-      return;
-    }
-
-    setIsSyncing(true);
-    try {
-      const queue = await getSyncQueue();
-      for (const operation of queue) {
-        const { type, data } = operation;
-        switch (type) {
-          case 'createNote': {
-            const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
-            await googleDriveApi.uploadFile(new File([blob], `${data.id}.json`), folderIds.notes);
-            break;
-          }
-          case 'updateNote': {
-            const { noteId, updates } = data;
-            const note = currentNotes.find((n) => n.id === noteId);
-            const updatedNote = { ...note, ...updates };
-            const blob = new Blob([JSON.stringify(updatedNote)], { type: 'application/json' });
-            const file = new File([blob], `${noteId}.json`);
-            const { files } = await googleDriveApi.listFiles(folderIds.notes);
-            const oldFile = files.find((f) => f.name === `${noteId}.json`);
-            if (oldFile) await googleDriveApi.deleteFile(oldFile.id);
-            await googleDriveApi.uploadFile(file, folderIds.notes);
-            break;
-          }
-          case 'deleteNote': {
-            const { noteId } = data;
-            const { files } = await googleDriveApi.listFiles(folderIds.notes);
-            const file = files.find((f) => f.name === `${noteId}.json`);
-            if (file) await googleDriveApi.deleteFile(file.id);
-            break;
-          }
-          case 'createTag':
-          case 'updateTag':
-          case 'deleteTag': {
-            const blob = new Blob([JSON.stringify(currentTags)], { type: 'application/json' });
-            const { files } = await googleDriveApi.listFiles(folderIds.tags);
-            const oldFile = files.find((f) => f.name === 'tags.json');
-            if (oldFile) await googleDriveApi.deleteFile(oldFile.id);
-            await googleDriveApi.uploadFile(new File([blob], 'tags.json'), folderIds.tags);
-            break;
-          }
-          default:
-            break;
+    const syncToGoogleDrive = useCallback(async (currentTags = tags, currentNotes = notes) => {
+        if (!googleDriveApi || !folderIds) {
+            console.log('Drive not available, skipping sync');
+            return;
         }
-        await clearSyncItem(operation.id);
-      }
-      // No progress bar update here; only toast for success
-      // showToast('Synced successfully', 'success'); // Uncomment if desired
-    } catch (err) {
-      console.error('Sync failed:', err);
-      showToast('Failed to sync with Google Drive. Changes saved locally.', 'error');
-    } finally {
-      setIsSyncing(false);
-    }
-  }, [googleDriveApi, folderIds, tags, notes, showToast]);
 
-useEffect(() => {
+        setIsSyncing(true);
+        try {
+            const queue = await getSyncQueue();
+            for (const operation of queue) {
+                const { type, data } = operation;
+                switch (type) {
+                    case 'createNote': {
+                        const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+                        await googleDriveApi.uploadFile(new File([blob], `${data.id}.json`), folderIds.notes);
+                        break;
+                    }
+                    case 'updateNote': {
+                        const { noteId, updates } = data;
+                        const note = currentNotes.find((n) => n.id === noteId);
+                        const updatedNote = { ...note, ...updates };
+                        const blob = new Blob([JSON.stringify(updatedNote)], { type: 'application/json' });
+                        const file = new File([blob], `${noteId}.json`);
+                        const { files } = await googleDriveApi.listFiles(folderIds.notes);
+                        const oldFile = files.find((f) => f.name === `${noteId}.json`);
+                        if (oldFile) await googleDriveApi.deleteFile(oldFile.id);
+                        await googleDriveApi.uploadFile(file, folderIds.notes);
+                        break;
+                    }
+                    case 'deleteNote': {
+                        const { noteId } = data;
+                        const { files } = await googleDriveApi.listFiles(folderIds.notes);
+                        const file = files.find((f) => f.name === `${noteId}.json`);
+                        if (file) await googleDriveApi.deleteFile(file.id);
+                        break;
+                    }
+                    case 'createTag':
+                    case 'updateTag':
+                    case 'deleteTag': {
+                        const blob = new Blob([JSON.stringify(currentTags)], { type: 'application/json' });
+                        const { files } = await googleDriveApi.listFiles(folderIds.tags);
+                        const oldFile = files.find((f) => f.name === 'tags.json');
+                        if (oldFile) await googleDriveApi.deleteFile(oldFile.id);
+                        await googleDriveApi.uploadFile(new File([blob], 'tags.json'), folderIds.tags);
+                        break;
+                    }
+                    default:
+                        break;
+                }
+                await clearSyncItem(operation.id);
+            }
+        } catch (err) {
+            console.error('Sync failed:', err);
+            showToast('Failed to sync with Google Drive. Changes saved locally.', 'error');
+        } finally {
+            setIsSyncing(false);
+        }
+    }, [googleDriveApi, folderIds, tags, notes, showToast]);
+
+    useEffect(() => {
         console.log('useNotes: Loading initial data');
         loadInitialData().catch((err) => {
             console.error('Initial load failed:', err);
@@ -268,142 +293,156 @@ useEffect(() => {
         return () => clearInterval(interval);
     }, [syncToGoogleDrive, tags, notes]);
 
-  const createNote = useCallback(
-    async (noteData) => {
-      try {
-        const note = {
-          id: crypto.randomUUID(),
-          ...noteData,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        };
-        const updatedNotes = [note, ...notes];
-        setNotes(updatedNotes);
-        await setInDB('notes', 'notes_data', updatedNotes);
-        await addToSyncQueue({ type: 'createNote', data: note });
-        showToast('Note created', 'success');
-        await syncToGoogleDrive(tags, updatedNotes);
-        return note;
-      } catch (err) {
-        showToast(`Failed to create note: ${err.message}`, 'error');
-        throw err;
-      }
-    },
-    [notes, showToast, syncToGoogleDrive, tags]
-  );
+    const createNote = useCallback(
+        async (noteData) => {
+            try {
+                const note = {
+                    id: crypto.randomUUID(),
+                    ...noteData,
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                };
+                const updatedNotes = [note, ...notes];
+                setNotes(updatedNotes);
+                await setInDB('notes', 'notes_data', updatedNotes);
+                events.emit('notesUpdated'); // Emit event after IndexedDB update
+                await addToSyncQueue({ type: 'createNote', data: note });
+                showToast('Note created', 'success');
+                await syncToGoogleDrive(tags, updatedNotes);
+                return note;
+            } catch (err) {
+                showToast(`Failed to create note: ${err.message}`, 'error');
+                throw err;
+            }
+        },
+        [notes, showToast, syncToGoogleDrive, tags, events]
+    );
 
-  const updateNote = useCallback(
-    async (noteId, updates) => {
-      try {
-        const note = notes.find((n) => n.id === noteId);
-        if (!note) throw new Error('Note not found');
-        const updatedNote = { ...note, ...updates, updatedAt: new Date().toISOString() };
-        const updatedNotes = notes.map((n) => (n.id === noteId ? updatedNote : n));
-        setNotes(updatedNotes);
-        await setInDB('notes', 'notes_data', updatedNotes);
-        await addToSyncQueue({ type: 'updateNote', data: { noteId, updates } });
-        showToast('Note updated', 'success');
-        await syncToGoogleDrive(tags, updatedNotes);
-        return updatedNote;
-      } catch (err) {
-        showToast(`Failed to update note: ${err.message}`, 'error');
-        throw err;
-      }
-    },
-    [notes, showToast, syncToGoogleDrive, tags]
-  );
+    const updateNote = useCallback(
+        async (noteId, updates) => {
+            try {
+                const note = notes.find((n) => n.id === noteId);
+                if (!note) throw new Error('Note not found');
+                const updatedNote = { ...note, ...updates, updatedAt: new Date().toISOString() };
+                const updatedNotes = notes.map((n) => (n.id === noteId ? updatedNote : n));
+                setNotes(updatedNotes);
+                await setInDB('notes', 'notes_data', updatedNotes);
+                events.emit('notesUpdated'); // Emit event after IndexedDB update
+                await addToSyncQueue({ type: 'updateNote', data: { noteId, updates } });
+                showToast('Note updated', 'success');
+                await syncToGoogleDrive(tags, updatedNotes);
+                return updatedNote;
+            } catch (err) {
+                showToast(`Failed to update note: ${err.message}`, 'error');
+                throw err;
+            }
+        },
+        [notes, showToast, syncToGoogleDrive, tags, events]
+    );
 
-  const deleteNote = useCallback(
-    async (noteId) => {
-      try {
-        const updatedNotes = notes.filter((n) => n.id !== noteId);
-        setNotes(updatedNotes);
-        await setInDB('notes', 'notes_data', updatedNotes);
-        await addToSyncQueue({ type: 'deleteNote', data: { noteId } });
-        showToast('Note deleted', 'success');
-        await syncToGoogleDrive(tags, updatedNotes);
-      } catch (err) {
-        showToast(`Failed to delete note: ${err.message}`, 'error');
-        throw err;
-      }
-    },
-    [notes, showToast, syncToGoogleDrive, tags]
-  );
+    const deleteNote = useCallback(
+        async (noteId) => {
+            try {
+                const updatedNotes = notes.filter((n) => n.id !== noteId);
+                setNotes(updatedNotes);
+                await setInDB('notes', 'notes_data', updatedNotes);
+                events.emit('notesUpdated'); // Emit event after IndexedDB update
+                await addToSyncQueue({ type: 'deleteNote', data: { noteId } });
+                showToast('Note deleted', 'success');
+                await syncToGoogleDrive(tags, updatedNotes);
+            } catch (err) {
+                showToast(`Failed to delete note: ${err.message}`, 'error');
+                throw err;
+            }
+        },
+        [notes, showToast, syncToGoogleDrive, tags, events]
+    );
 
-  const createTag = useCallback(
-    async (tagData) => {
-      try {
-        const newTag = {
-          id: crypto.randomUUID(),
-          name: tagData.name,
-          color: tagData.color || 'bg-gray-500/20 text-gray-500',
-        };
-        const updatedTags = [...tags, newTag];
-        setTags(updatedTags);
-        await setInDB('tags', 'tags_data', updatedTags);
-        await addToSyncQueue({ type: 'createTag', data: newTag });
-        showToast('Tag created', 'success');
-        await syncToGoogleDrive(updatedTags, notes);
-        return newTag;
-      } catch (err) {
-        showToast(`Failed to create tag: ${err.message}`, 'error');
-        throw err;
-      }
-    },
-    [tags, showToast, syncToGoogleDrive, notes]
-  );
+    const createTag = useCallback(
+        async (tagData) => {
+            try {
+                const newTag = {
+                    id: crypto.randomUUID(),
+                    name: tagData.name,
+                    color: tagData.color || 'bg-gray-500/20 text-gray-500',
+                };
+                const updatedTags = [...tags, newTag];
+                setTags(updatedTags);
+                await setInDB('tags', 'tags_data', updatedTags);
+                await addToSyncQueue({ type: 'createTag', data: newTag });
+                showToast('Tag created', 'success');
+                await syncToGoogleDrive(updatedTags, notes);
+                return newTag;
+            } catch (err) {
+                showToast(`Failed to create tag: ${err.message}`, 'error');
+                throw err;
+            }
+        },
+        [tags, showToast, syncToGoogleDrive, notes]
+    );
 
-  const updateTag = useCallback(
-    async (tagId, updates) => {
-      try {
-        const existingTag = tags.find((t) => t.id === tagId);
-        if (!existingTag) throw new Error('Tag not found');
-        const updatedTag = {
-          ...existingTag,
-          name: updates.name || existingTag.name,
-          color: updates.color || existingTag.color,
-        };
-        const updatedTags = tags.map((t) => (t.id === tagId ? updatedTag : t));
-        setTags(updatedTags);
-        await setInDB('tags', 'tags_data', updatedTags);
-        await addToSyncQueue({ type: 'updateTag', data: { tagId, ...updatedTag } });
-        showToast('Tag updated', 'success');
-        await syncToGoogleDrive(updatedTags, notes);
-      } catch (err) {
-        showToast(`Failed to update tag: ${err.message}`, 'error');
-        throw err;
-      }
-    },
-    [tags, showToast, syncToGoogleDrive, notes]
-  );
+    const updateTag = useCallback(
+        async (tagId, updates) => {
+            try {
+                const existingTag = tags.find((t) => t.id === tagId);
+                if (!existingTag) throw new Error('Tag not found');
+                const updatedTag = {
+                    ...existingTag,
+                    name: updates.name || existingTag.name,
+                    color: updates.color || existingTag.color,
+                };
+                const updatedTags = tags.map((t) => (t.id === tagId ? updatedTag : t));
+                setTags(updatedTags);
+                await setInDB('tags', 'tags_data', updatedTags);
+                await addToSyncQueue({ type: 'updateTag', data: { tagId, ...updatedTag } });
+                showToast('Tag updated', 'success');
+                await syncToGoogleDrive(updatedTags, notes);
+            } catch (err) {
+                showToast(`Failed to update tag: ${err.message}`, 'error');
+                throw err;
+            }
+        },
+        [tags, showToast, syncToGoogleDrive, notes]
+    );
 
-  const deleteTag = useCallback(
-    async (tagId) => {
-      try {
-        const updatedTags = tags.filter((t) => t.id !== tagId);
-        const updatedNotes = notes.map((n) => ({
-          ...n,
-          tags: n.tags?.filter((t) => t !== tagId) || [],
-        }));
-        setTags(updatedTags);
-        setNotes(updatedNotes);
-        await setInDB('tags', 'tags_data', updatedTags);
-        await setInDB('notes', 'notes_data', updatedNotes);
-        await addToSyncQueue({ type: 'deleteTag', data: { tagId } });
-        showToast('Tag deleted', 'success');
-        await syncToGoogleDrive(updatedTags, updatedNotes);
-      } catch (err) {
-        showToast(`Failed to delete tag: ${err.message}`, 'error');
-        throw err;
-      }
-    },
-    [notes, tags, showToast, syncToGoogleDrive]
-  );
+    const deleteTag = useCallback(
+        async (tagId) => {
+            try {
+                const updatedTags = tags.filter((t) => t.id !== tagId);
+                const updatedNotes = notes.map((n) => ({
+                    ...n,
+                    tags: n.tags?.filter((t) => t !== tagId) || [],
+                }));
+                setTags(updatedTags);
+                setNotes(updatedNotes);
+                await setInDB('tags', 'tags_data', updatedTags);
+                await setInDB('notes', 'notes_data', updatedNotes);
+                events.emit('notesUpdated'); // Emit event after IndexedDB update
+                await addToSyncQueue({ type: 'deleteTag', data: { tagId } });
+                showToast('Tag deleted', 'success');
+                await syncToGoogleDrive(updatedTags, updatedNotes);
+            } catch (err) {
+                showToast(`Failed to delete tag: ${err.message}`, 'error');
+                throw err;
+            }
+        },
+        [notes, tags, showToast, syncToGoogleDrive, events]
+    );
 
-const refreshData = useCallback(() => {
+    const refreshData = useCallback(() => {
         hasLoadedFromDrive.current = false;
         loadData(true);
     }, [loadData]);
+
+    const refreshFromIndexedDB = useCallback(async () => {
+        try {
+            const cachedNotes = (await getFromDB('notes', 'notes_data')) || [];
+            setNotes(cachedNotes);
+        } catch (err) {
+            console.error('Failed to refresh notes from IndexedDB:', err);
+            showToast('Failed to refresh notes', 'error');
+        }
+    }, [showToast]);
 
     return {
         notes,
@@ -419,7 +458,9 @@ const refreshData = useCallback(() => {
         updateTag,
         deleteTag,
         refreshData,
+        refreshFromIndexedDB,
         loadingState,
         googleDriveApi,
+        events,
     };
 }

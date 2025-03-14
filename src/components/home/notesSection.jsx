@@ -1,9 +1,10 @@
-import { useRef, useState, useEffect, useCallback } from 'react';
+// src/components/home/notesSection.jsx
+import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react'; // Add useMemo
+import { useNavigate } from 'react-router-dom';
+import debounce from 'lodash/debounce'; // Add Lodash debounce
 import { NoteCard } from './noteCard';
 import { Button } from '../ui/button';
 import { ChevronRight } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-import React from 'react';
 
 export const NotesSection = React.memo(
   ({ title, notes = [], sectionKey, refreshNotes }) => {
@@ -11,48 +12,54 @@ export const NotesSection = React.memo(
     const [gradients, setGradients] = useState({ left: false, right: false });
     const navigate = useNavigate();
 
-    const handleScroll = useCallback(() => {
-      const container = scrollContainerRef.current;
-      if (container) {
-        const { scrollLeft, clientWidth, scrollWidth } = container;
-        setGradients({
-          left: scrollLeft > 0,
-          right: scrollLeft + clientWidth < scrollWidth,
-        });
-      }
-    }, []);
+    // Memoize uniqueNotes to prevent unnecessary re-renders
+    const uniqueNotes = useMemo(
+      () => Array.from(new Map(notes.map(note => [note.id, note])).values()),
+      [notes]
+    );
+
+    const handleScroll = useCallback(
+      debounce(() => {
+        const container = scrollContainerRef.current;
+        if (container) {
+          const { scrollLeft, clientWidth, scrollWidth } = container;
+          setGradients({
+            left: scrollLeft > 0,
+            right: scrollLeft + clientWidth < scrollWidth,
+          });
+        }
+      }, 100),
+      []
+    );
 
     useEffect(() => {
       const container = scrollContainerRef.current;
       if (container) {
-        const { clientWidth, scrollWidth } = container;
-        setGradients({
-          left: container.scrollLeft > 0,
-          right: scrollWidth > clientWidth,
-        });
+        handleScroll(); // Initial check
         container.addEventListener('scroll', handleScroll);
         return () => container.removeEventListener('scroll', handleScroll);
       }
-    }, [notes, handleScroll]);
+    }, [handleScroll]); // Only depends on handleScroll, not uniqueNotes
 
     const handleSeeMore = () => {
-      navigate(`/section/${sectionKey}`, { state: { notes, title } });
+      navigate(`/section/${sectionKey}`, { state: { notes: uniqueNotes, title } });
     };
 
-    if (!notes.length) return null;
+    if (!uniqueNotes.length) return null;
 
     return (
       <section className="space-y-2 overflow-hidden">
         <div className="flex justify-between items-center">
           <div className="flex items-baseline gap-2">
             <h2 className="text-xl font-semibold tracking-tight">{title}</h2>
-            <span className="text-sm text-text-primary/60">{notes.length} notes</span>
+            <span className="text-sm text-text-primary/60">{uniqueNotes.length} notes</span>
           </div>
           <Button
             variant="ghost"
             size="sm"
             className="text-sm font-medium hover:bg-overlay/10"
             onClick={handleSeeMore}
+            aria-label={`See more notes in ${title} section`}
           >
             See More <ChevronRight className="ml-1 h-4 w-4" />
           </Button>
@@ -62,7 +69,7 @@ export const NotesSection = React.memo(
             ref={scrollContainerRef}
             className="flex gap-4 overflow-x-auto overflow-y-hidden overscroll-x-contain pb-4 snap-x scrollbar-hide"
           >
-            {notes.map(note => (
+            {uniqueNotes.map(note => (
               <div key={note.id} className="flex-none w-[280px] snap-start">
                 <NoteCard note={note} refreshNotes={refreshNotes} />
               </div>
@@ -80,14 +87,10 @@ export const NotesSection = React.memo(
   },
   (prevProps, nextProps) => {
     return (
-      prevProps.notes === nextProps.notes &&
       prevProps.title === nextProps.title &&
       prevProps.sectionKey === nextProps.sectionKey &&
-      prevProps.refreshNotes === nextProps.refreshNotes
+      prevProps.refreshNotes === nextProps.refreshNotes &&
+      prevProps.notes === nextProps.notes // Shallow compare
     );
   }
 );
-
-export const renderSection = (title, notes, key) => {
-  return <NotesSection key={key} sectionKey={key} title={title} notes={notes} />;
-};

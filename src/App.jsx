@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import React, { Suspense, lazy, useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Analytics } from '@vercel/analytics/react';
 import { supabase } from './utils/supabaseClient';
@@ -8,11 +8,11 @@ import { NotesProvider, useNotes } from './contexts/NotesContext';
 import Home from './pages/home';
 import Login from './pages/login';
 import AuthCallback from './pages/auth/callback';
-import CreateNote from './pages/create';
+import CreateNote from './pages/note/create';
 import EditNote from './pages/note/edit/[id]';
 import ViewNote from './pages/note/view/[id]';
-import SectionView from './pages/section/[id]';
-import Settings from './pages/settings';
+const Settings = lazy(() => import('./pages/settings'));
+const SectionView = lazy(() => import('./pages/section/[id]'));
 import ErrorBoundary from './components/ErrorBoundary';
 import ProgressBar from './components/ProgressBar';
 
@@ -21,15 +21,17 @@ function AppContent({ session, isLoading: isAuthLoading, setIsInitialLoad }) {
   const { isLoading: isNotesLoading, isSyncing, isInitialSync, loadingState } = useNotes();
 
   useEffect(() => {
-    // Set isInitialLoad to false when all initial loading is complete
     if (!isAuthLoading && !isDriveLoading && !isNotesLoading && !isInitialSync) {
       console.log('All initial loading complete, setting isInitialLoad to false');
       setIsInitialLoad(false);
     }
   }, [isAuthLoading, isDriveLoading, isNotesLoading, isInitialSync, setIsInitialLoad]);
 
-  // Render Login page if no session exists
-  if (!session && !isAuthLoading) {
+  if (isAuthLoading) {
+    return <ProgressBar progress={-1} message="Checking authentication..." />;
+  }
+
+  if (!session) {
     return (
       <Routes>
         <Route path="/login" element={<Login />} />
@@ -39,30 +41,30 @@ function AppContent({ session, isLoading: isAuthLoading, setIsInitialLoad }) {
     );
   }
 
-  // Show ProgressBar during initial loading (auth, drive, or notes sync)
-  if (isAuthLoading || isDriveLoading || (isNotesLoading && isInitialSync)) {
+  if (isDriveLoading || (isNotesLoading && isInitialSync)) {
     return (
       <ProgressBar
-        progress={isAuthLoading ? 0 : loadingState.progress} // Use 0 during auth, then notes progress
-        message={isAuthLoading ? 'Checking authentication...' : loadingState.message}
+        progress={loadingState.progress}
+        message={loadingState.message}
       />
     );
   }
 
-  // Render authenticated routes when session exists and initial loading is complete
   return (
-    <ErrorBoundary fallback={<div>Something went wrong</div>}>
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/note/edit/:id" element={<EditNote />} />
-        <Route path="/note/view/:id" element={<ViewNote />} />
-        <Route path="/section/:id" element={<SectionView />} />
-        <Route path="/settings" element={<Settings />} />
-        <Route path="/create" element={<CreateNote />} />
-        <Route path="/login" element={<Navigate to="/" replace />} />
-        <Route path="/auth/callback" element={<AuthCallback />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+    <ErrorBoundary fallback={<div>Something went wrong, yo! Try refreshing.</div>}>
+      <Suspense fallback={<ProgressBar progress={50} message="Loading..." />}>
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/note/edit/:id" element={<EditNote />} />
+          <Route path="/note/view/:id" element={<ViewNote />} />
+          <Route path="/settings" element={<Settings />} />
+          <Route path="/section/:id" element={<SectionView />} />
+          <Route path="/create" element={<CreateNote />} />
+          <Route path="/login" element={<Navigate to="/" replace />} />
+          <Route path="/auth/callback" element={<AuthCallback />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Suspense>
     </ErrorBoundary>
   );
 }
@@ -73,20 +75,18 @@ function App() {
   const [isInitialLoad, setIsInitialLoad] = useState(true);
 
   useEffect(() => {
+    let mounted = true;
+
     const initializeSession = async () => {
       try {
         const { data: { session }, error } = await supabase.auth.getSession();
-        if (error) {
-          console.error('Initial session error:', error);
-          setSession(null);
-        } else {
-          setSession(session);
-        }
+        if (error) throw error;
+        if (mounted) setSession(session);
       } catch (err) {
         console.error('Error fetching session:', err);
-        setSession(null);
+        if (mounted) setSession(null);
       } finally {
-        setIsLoading(false); // Ensure loading is false after auth check
+        if (mounted) setIsLoading(false);
       }
     };
 
@@ -94,15 +94,17 @@ function App() {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, newSession) => {
       console.log('Auth state changed:', event);
-      setSession(newSession);
-      if (event === 'SIGNED_IN') {
-        setIsInitialLoad(true); // Reset for initial sync on sign-in
-      } else if (event === 'SIGNED_OUT') {
-        setIsInitialLoad(false);
+      if (mounted) {
+        setSession(newSession);
+        if (event === 'SIGNED_IN') setIsInitialLoad(true);
+        else if (event === 'SIGNED_OUT') setIsInitialLoad(false);
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   return (
