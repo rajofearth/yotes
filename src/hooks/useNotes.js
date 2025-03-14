@@ -340,23 +340,27 @@ export function useNotes() {
         [notes, showToast, syncToGoogleDrive, tags, events]
     );
 
-    const deleteNote = useCallback(
-        async (noteId) => {
-            try {
-                const updatedNotes = notes.filter((n) => n.id !== noteId);
-                setNotes(updatedNotes);
-                await setInDB('notes', 'notes_data', updatedNotes);
-                events.emit('notesUpdated'); // Emit event after IndexedDB update
-                await addToSyncQueue({ type: 'deleteNote', data: { noteId } });
-                showToast('Note deleted', 'success');
-                await syncToGoogleDrive(tags, updatedNotes);
-            } catch (err) {
-                showToast(`Failed to delete note: ${err.message}`, 'error');
-                throw err;
-            }
-        },
-        [notes, showToast, syncToGoogleDrive, tags, events]
-    );
+const deleteNote = useCallback(
+  async (noteId) => {
+    try {
+      const updatedNotes = notes.filter((n) => n.id !== noteId);
+      setNotes(updatedNotes); // Update state immediately
+      await setInDB('notes', 'notes_data', updatedNotes); // Update IndexedDB
+      events.emit('notesUpdated'); // Emit event (optional, if hooked elsewhere)
+      showToast('Note deleted', 'success'); // Toast ASAP
+      await addToSyncQueue({ type: 'deleteNote', data: { noteId } }); // Queue sync
+      // Run Drive sync in background
+      syncToGoogleDrive(tags, updatedNotes).catch((err) => {
+        console.error('Background sync failed:', err);
+        showToast('Sync to Drive failed, note deleted locally', 'error');
+      });
+    } catch (err) {
+      showToast(`Failed to delete note: ${err.message}`, 'error');
+      throw err;
+    }
+  },
+  [notes, showToast, syncToGoogleDrive, tags, events]
+);
 
     const createTag = useCallback(
         async (tagData) => {

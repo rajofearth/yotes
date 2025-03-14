@@ -1,4 +1,5 @@
-import React, { useState, useCallback } from 'react'; // Add React here
+// src/components/home/noteCard.jsx
+import React, { useState, useCallback } from 'react'; 
 import { useNavigate } from 'react-router-dom';
 import { Card } from '../ui/card';
 import { Button } from '../ui/button';
@@ -42,19 +43,18 @@ export const NoteCard = React.memo(
       setShowFulldescription(true);
     };
 
-    const handleDelete = useCallback(async (e) => {
-      e.stopPropagation();
-      setIsLoadingDelete(true);
-      try {
-        await deleteNote(note.id);
-        refreshNotes();
-        showToast('Note deleted', 'success');
-      } catch (error) {
-        setIsLoadingDelete(false);
-        showToast('Failed to delete note', 'error');
-        console.error('Delete error:', error);
-      }
-    }, [note.id, deleteNote, refreshNotes, showToast]);
+// src/components/home/noteCard.jsx (snippet)
+const handleDelete = useCallback(async (e) => {
+  e.stopPropagation();
+  setIsLoadingDelete(true);
+  try {
+    await deleteNote(note.id); // deleteNote now toasts "Note deleted"
+    navigate('/', { state: { refresh: true } }); // Navigate immediately
+  } catch (error) {
+    setIsLoadingDelete(false);
+    console.error('Delete error:', error);
+  }
+}, [note.id, deleteNote, navigate]);
 
     return (
       <Card
@@ -75,7 +75,7 @@ export const NoteCard = React.memo(
                   className="h-6 w-6 p-0 text-text-primary/60 hover:text-text-primary"
                   onClick={(e) => e.stopPropagation()}
                   disabled={isLoadingDelete}
-                  aria-label="Note options" // Accessibility bonus
+                  aria-label="Note options"
                 >
                   <MoreHorizontal className="h-3 w-3" />
                   <span className="sr-only">Open menu</span>
@@ -120,7 +120,7 @@ export const NoteCard = React.memo(
         {(note.tags && note.tags.length > 0) && (
           <>
             <hr className="mt-1 border-t border-overlay/10" />
-            <footer className="flex items-center gap-1 pt-1">
+            <footer className="flex items-center gap-1 pt-1 overflow-x-scroll scrollbar-hide">
               <span className="text-xs text-text-primary/60">
                 {formattedTime}
               </span>

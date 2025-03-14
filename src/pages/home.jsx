@@ -7,19 +7,23 @@ import { useNotes } from '../contexts/NotesContext';
 import { useLocation } from 'react-router-dom';
 import { applyFiltersAndSearch, debounce } from '../utils/noteFilters';
 import { ErrorState } from '../components/home/ErrorState';
+import { useNavigate } from 'react-router-dom';
 
 export default function Home() {
+    const navigate = useNavigate();
     const { notes, tags, error, refreshData, refreshFromIndexedDB } = useNotes(); // Removed events
     const location = useLocation();
     const [filteredNotes, setFilteredNotes] = useState(notes);
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedTagIds, setSelectedTagIds] = useState(['all']);
 
-    // Removed the useEffect for events since it's no longer needed
-    useEffect(() => {
-        if (location.state?.refresh) refreshData();
-        setFilteredNotes(applyFiltersAndSearch(notes, searchQuery, selectedTagIds));
-    }, [notes, searchQuery, selectedTagIds, location.state?.refresh, refreshData]);
+useEffect(() => {
+  if (location.state?.refresh) {
+    refreshData(); // Re-sync from Drive and IndexedDB
+    navigate('/', { replace: true, state: {} }); // Clear state
+  }
+  setFilteredNotes(applyFiltersAndSearch(notes, searchQuery, selectedTagIds));
+}, [notes, searchQuery, selectedTagIds, location.state?.refresh, refreshData, navigate]);
 
     const handleSearch = useCallback(debounce(query => setSearchQuery(query), 300), []);
     const handleFilterChange = tagIds => setSelectedTagIds(tagIds.length === 0 ? ['all'] : tagIds);
