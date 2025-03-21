@@ -3,14 +3,29 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { ColorSelect, colorOptions } from './ColorSelect';
+import { useEffect } from 'react';
 
 export const CreateTagDialog = ({ open, onOpenChange, tagState, setTagState, handleTagAction }) => {
+
+  // Function to get a random color from colorOptions
+  const getRandomColor = () => {
+    const randomIndex = Math.floor(Math.random() * colorOptions.length);
+    return colorOptions[randomIndex].value;
+  };
+
+    //set the tag color when the dialog opens
+  useEffect(() => {
+    if(open){
+        setTagState(prev => ({...prev, newColor: getRandomColor()}));
+    }
+  }, [open, setTagState])
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="bg-bg-primary border-overlay/10 shadow-lg">
         <DialogHeader>
           <DialogTitle className="text-xl font-semibold text-text-primary">Create New Tag</DialogTitle>
-          <DialogDescription className="text-text-primary/60">Enter a name and pick a color for your new tag.</DialogDescription>
+          <DialogDescription className="text-text-primary/60">Enter a name for your new tag.</DialogDescription>
         </DialogHeader>
         <div className="py-4 space-y-4">
           <Input
@@ -20,10 +35,11 @@ export const CreateTagDialog = ({ open, onOpenChange, tagState, setTagState, han
             onChange={e => setTagState(prev => ({ ...prev, newName: e.target.value }))}
             className="w-full bg-overlay/5 border-overlay/10"
           />
-          <ColorSelect
+          {/*  Comment out or remove the ColorSelect component */}
+          {/* <ColorSelect
             value={tagState.newColor}
             onValueChange={(value) => setTagState((prev) => ({ ...prev, newColor: value }))}
-          />
+          /> */}
           <div className="flex items-center gap-2">
             <span className="text-sm text-text-primary/60">Preview:</span>
             <span
