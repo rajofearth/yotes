@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useNotes } from '../../../hooks/useNotes';
 import { Button } from '../../../components/ui/button';
 import { ArrowLeft, Pencil } from 'lucide-react';
-import { Badge } from '../../../components/ui/badge';
+import { TagList } from '../../../components/tags/TagList';
 
 export default function ViewNote() {
     const { id } = useParams();
@@ -84,29 +84,13 @@ export default function ViewNote() {
                     </Button>
                 </div>
             </header>
-
             <main className="max-w-[1920px] mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-5 sm:space-y-6">
                 <div className="space-y-4">
                     {note.description && (
                         <p className="text-sm sm:text-base text-text-primary/80 leading-relaxed">{note.description}</p>
                     )}
-                    {note.tags?.length > 0 && (
-                        <div className="flex flex-wrap gap-1.5 sm:gap-2">
-                            {note.tags.map((tagId, index) => {
-                                const tag = tags.find(t => t.id === tagId);
-                                return tag ? (
-                                    <Badge
-                                        key={`${note.id}-tag-${tagId}-${index}`}
-                                        className={`px-1.5 sm:px-2 py-0.5 text-xs sm:text-xs ${tag.color || 'bg-gray-500/20 text-gray-500'}`}
-                                    >
-                                        {tag.name}
-                                    </Badge>
-                                ) : null;
-                            })}
-                        </div>
-                    )}
+                      <TagList tagIds={note.tags} tags={tags}  />
                 </div>
-
                 <div className="bg-overlay/5 p-4 sm:p-6 rounded-lg border border-overlay/10 whitespace-pre-wrap text-sm sm:text-base leading-relaxed">
                     {note.content}
                 </div>

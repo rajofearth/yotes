@@ -1,3 +1,4 @@
+// src/App.jsx
 import React, { Suspense, lazy, useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Analytics } from '@vercel/analytics/react';
@@ -8,29 +9,24 @@ import { NotesProvider, useNotes } from './contexts/NotesContext';
 import Home from './pages/home';
 import Login from './pages/login';
 import AuthCallback from './pages/auth/callback';
-import CreateNote from './pages/note/create';
-import EditNote from './pages/note/edit/[id]';
 import ViewNote from './pages/note/view/[id]';
 const Settings = lazy(() => import('./pages/settings'));
 const SectionView = lazy(() => import('./pages/section/[id]'));
 import ErrorBoundary from './components/ErrorBoundary';
 import ProgressBar from './components/ProgressBar';
-
+import NoteEditor from './pages/note/NoteEditor';
 function AppContent({ session, isLoading: isAuthLoading, setIsInitialLoad }) {
   const { isLoading: isDriveLoading } = useGoogleDrive();
   const { isLoading: isNotesLoading, isSyncing, isInitialSync, loadingState } = useNotes();
-
   useEffect(() => {
     if (!isAuthLoading && !isDriveLoading && !isNotesLoading && !isInitialSync) {
       console.log('All initial loading complete, setting isInitialLoad to false');
       setIsInitialLoad(false);
     }
   }, [isAuthLoading, isDriveLoading, isNotesLoading, isInitialSync, setIsInitialLoad]);
-
   if (isAuthLoading) {
     return <ProgressBar progress={-1} message="Checking authentication..." />;
   }
-
   if (!session) {
     return (
       <Routes>
@@ -40,7 +36,6 @@ function AppContent({ session, isLoading: isAuthLoading, setIsInitialLoad }) {
       </Routes>
     );
   }
-
   if (isDriveLoading || (isNotesLoading && isInitialSync)) {
     return (
       <ProgressBar
@@ -49,17 +44,16 @@ function AppContent({ session, isLoading: isAuthLoading, setIsInitialLoad }) {
       />
     );
   }
-
   return (
     <ErrorBoundary fallback={<div>Something went wrong, yo! Try refreshing.</div>}>
       <Suspense fallback={<ProgressBar progress={50} message="Loading..." />}>
         <Routes>
           <Route path="/" element={<Home />} />
-          <Route path="/note/edit/:id" element={<EditNote />} />
+          <Route path="/note/edit/:id" element={<NoteEditor />} />
           <Route path="/note/view/:id" element={<ViewNote />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/section/:id" element={<SectionView />} />
-          <Route path="/create" element={<CreateNote />} />
+          <Route path="/create" element={<NoteEditor />} />
           <Route path="/login" element={<Navigate to="/" replace />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
           <Route path="*" element={<Navigate to="/" replace />} />
@@ -68,15 +62,12 @@ function AppContent({ session, isLoading: isAuthLoading, setIsInitialLoad }) {
     </ErrorBoundary>
   );
 }
-
 function App() {
   const [session, setSession] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
-
   useEffect(() => {
     let mounted = true;
-
     const initializeSession = async () => {
       try {
         const { data: { session }, error } = await supabase.auth.getSession();
@@ -89,9 +80,7 @@ function App() {
         if (mounted) setIsLoading(false);
       }
     };
-
     initializeSession();
-
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, newSession) => {
       console.log('Auth state changed:', event);
       if (mounted) {
@@ -100,13 +89,11 @@ function App() {
         else if (event === 'SIGNED_OUT') setIsInitialLoad(false);
       }
     });
-
     return () => {
       mounted = false;
       subscription.unsubscribe();
     };
   }, []);
-
   return (
     <ToastProvider>
       <Router>
@@ -124,5 +111,4 @@ function App() {
     </ToastProvider>
   );
 }
-
 export default App;

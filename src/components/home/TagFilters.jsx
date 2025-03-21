@@ -11,18 +11,15 @@ import { Filter } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useNotes } from '../../hooks/useNotes';
-
-export const TagFilters = ({ onFilterChange }) => {
-    const { tags, createTag } = useNotes();
+export const TagFilters = ({ tags, onFilterChange, loadInitialData }) => {
+    const { createTag } = useNotes();
     const [selectedTags, setSelectedTags] = useState(['all']);
     const navigate = useNavigate();
-    
     // Sync selectedTags with onFilterChange and default to 'all' if empty
     useEffect(() => {
         const finalTags = selectedTags.length === 0 ? ['all'] : selectedTags;
         onFilterChange(finalTags);
     }, [selectedTags, onFilterChange]);
-
     const handleCheckboxChange = (tagId) => {
         setSelectedTags(prev => {
             if (tagId === 'all') {
@@ -35,7 +32,6 @@ export const TagFilters = ({ onFilterChange }) => {
             return updatedTags.length === 0 ? ['all'] : updatedTags; // Default to 'all' if no tags remain
         });
     };
-
     const handleManageTags = async () => {
         const newTagName = prompt('Enter new tag name:');
         if (newTagName) {
@@ -46,7 +42,6 @@ export const TagFilters = ({ onFilterChange }) => {
             }
         }
     };
-
     return (
         <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto scrollbar-hide">
