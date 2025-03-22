@@ -11,24 +11,36 @@ import { useNavigate } from 'react-router-dom';
 
 export default function Home() {
     const navigate = useNavigate();
-    const { notes, tags, error, refreshData, refreshFromIndexedDB } = useNotes(); // Removed events
+    const { notes, tags, error, refreshData } = useNotes();
     const location = useLocation();
     const [filteredNotes, setFilteredNotes] = useState(notes);
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedTagIds, setSelectedTagIds] = useState(['all']);
+    const groupedNotes = useMemo(() => groupNotesByDate(filteredNotes), [filteredNotes]);
+    const [expandedSections, setExpandedSections] = useState({ today: true }); // Default with "today" expanded
 
-useEffect(() => {
-  if (location.state?.refresh) {
-    refreshData(); // Re-sync from Drive and IndexedDB
-    navigate('/', { replace: true, state: {} }); // Clear state
-  }
-  setFilteredNotes(applyFiltersAndSearch(notes, searchQuery, selectedTagIds));
-}, [notes, searchQuery, selectedTagIds, location.state?.refresh, refreshData, navigate]);
+    // Sync expandedSections with note counts whenever groupedNotes changes
+    useEffect(() => {
+        setExpandedSections(prev => {
+            const newExpanded = { today: true }; // Always expand "today"
+            if (groupedNotes.Yesterday?.length === 1) newExpanded.yesterday = true;
+            Object.entries(groupedNotes.Earlier).forEach(([date, notes]) => {
+                if (notes.length === 1) newExpanded[date] = true;
+            });
+            return { ...prev, ...newExpanded }; // Merge with prev to keep manual toggles
+        });
+    }, [groupedNotes]);
+
+    useEffect(() => {
+        if (location.state?.refresh) {
+            refreshData();
+            navigate('/', { replace: true, state: {} });
+        }
+        setFilteredNotes(applyFiltersAndSearch(notes, searchQuery, selectedTagIds));
+    }, [notes, searchQuery, selectedTagIds, location.state?.refresh, refreshData, navigate]);
 
     const handleSearch = useCallback(debounce(query => setSearchQuery(query), 300), []);
     const handleFilterChange = tagIds => setSelectedTagIds(tagIds.length === 0 ? ['all'] : tagIds);
-
-    const groupedNotes = useMemo(() => groupNotesByDate(filteredNotes), [filteredNotes]);
 
     if (error) return <ErrorState error={error} />;
 
@@ -42,15 +54,49 @@ useEffect(() => {
                 ) : (
                     <>
                         {groupedNotes.Today?.length > 0 && (
-                            <NotesSection sectionKey="today" title="Today" notes={groupedNotes.Today} refreshNotes={refreshData} />
+                            <NotesSection
+                                sectionKey="today"
+                                title="Today"
+                                notes={groupedNotes.Today}
+                                refreshNotes={refreshData}
+                                isExpanded={expandedSections.today}
+                                toggleExpanded={() =>
+                                    setExpandedSections(prev => ({ ...prev, today: !prev.today }))
+                                }
+                            />
                         )}
                         {groupedNotes.Yesterday?.length > 0 && (
-                            <NotesSection sectionKey="yesterday" title="Yesterday" notes={groupedNotes.Yesterday} refreshNotes={refreshData} />
+                            <NotesSection
+                                sectionKey="yesterday"
+                                title="Yesterday"
+                                notes={groupedNotes.Yesterday}
+                                refreshNotes={refreshData}
+                                isExpanded={expandedSections.yesterday || false}
+                                toggleExpanded={() =>
+                                    setExpandedSections(prev => ({
+                                        ...prev,
+                                        yesterday: !prev.yesterday,
+                                    }))
+                                }
+                            />
                         )}
                         {Object.entries(groupedNotes.Earlier)
                             .filter(([, notes]) => notes.length > 0)
                             .map(([date, notes]) => (
-                                <NotesSection key={date} sectionKey={date} title={date} notes={notes} refreshNotes={refreshData} />
+                                <NotesSection
+                                    key={date}
+                                    sectionKey={date}
+                                    title={date}
+                                    notes={notes}
+                                    refreshNotes={refreshData}
+                                    isExpanded={expandedSections[date] || false}
+                                    toggleExpanded={() =>
+                                        setExpandedSections(prev => ({
+                                            ...prev,
+                                            [date]: !prev[date],
+                                        }))
+                                    }
+                                />
                             ))}
                     </>
                 )}
