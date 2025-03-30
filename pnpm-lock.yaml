@@ -117,6 +117,9 @@ importers:
       postcss:
         specifier: ^8.4.49
         version: 8.5.3
+      prop-types:
+        specifier: ^15.8.1
+        version: 15.8.1
       tailwindcss:
         specifier: ^3.4.16
         version: 3.4.17
