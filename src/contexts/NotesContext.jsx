@@ -75,7 +75,7 @@ export function NotesProvider({ children, session }) {
                 return;
             }
             try {
-                setLoadingState({ progress: 10, message: 'Fetching notes...' });
+                setLoadingState({ progress: 50, message: 'Fetching notes...' });
                 const { notes: fetchedNotes, tags: fetchedTags } = await pullChangesFromDrive(driveApi, folderIds);
 
                 if (fetchedNotes) {

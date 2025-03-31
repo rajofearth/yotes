@@ -49,7 +49,7 @@ export function useNotes() {
     const [isSyncing, setIsSyncing] = useState(false);
     const [isInitialSync, setIsInitialSync] = useState(true);
     const [error, setError] = useState(null);
-    const [loadingState, setLoadingState] = useState({ progress: 0, message: 'Initializing...' });
+    const [loadingState, setLoadingState] = useState({ progress: 5, message: 'Initializing...' });
     const showToastRaw = useToast();
     const hasLoadedFromDrive = useRef(false);
     const [googleDriveApi, setGoogleDriveApi] = useState(null);
