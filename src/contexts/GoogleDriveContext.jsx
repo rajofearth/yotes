@@ -54,6 +54,135 @@ export function GoogleDriveProvider({ children }) {
     setRefreshTimer(timer);
   }, []); // Removed dependency on refreshToken assuming stable identity via useCallback
 
+async function runDriveNotesDeduplication(driveApi, notesFolderId, showToast) {
+    if (!driveApi || !notesFolderId) {
+        console.warn('Deduplication check skipped: Drive API or notes folder ID missing.');
+        return;
+    }
+
+    console.log('Starting Google Drive notes deduplication check...');
+    showToast('Checking for duplicate notes in Google Drive...', 'info'); // Optional feedback
+
+    try {
+        // 1. List all files in the notes folder
+        const response = await driveApi.listFiles(notesFolderId, 1000); // Increase page size if needed
+        const files = response.files?.filter(f => f.name?.endsWith('.json')) || [];
+
+        if (files.length <= 1) {
+            console.log('No duplicates possible (0 or 1 note file found).');
+             showToast('No duplicate notes found.', 'success');
+            return; // No need to proceed
+        }
+
+        console.log(`Found ${files.length} potential note files. Downloading content...`);
+
+        // 2. Download content and parse JSON
+        const fileIds = files.map(f => f.id);
+        const blobs = await driveApi.downloadFiles(fileIds);
+
+        const notesData = [];
+        for (let i = 0; i < blobs.length; i++) {
+            const blob = blobs[i];
+            const originalFile = files[i]; // Assumes order is preserved
+            if (blob) {
+                try {
+                    const text = await blob.text();
+                    const note = JSON.parse(text);
+                    // Ensure essential fields exist for comparison
+                    if (note.id && (note.updatedAt || note.createdAt)) {
+                        notesData.push({
+                            noteId: note.id,
+                            noteUpdatedAt: note.updatedAt || note.createdAt, // Use updatedAt first
+                            driveFileId: originalFile.id,
+                            driveModifiedTime: originalFile.modifiedTime, // Keep Drive time as fallback
+                        });
+                    } else {
+                        console.warn(`Skipping file ${originalFile.name} (ID: ${originalFile.id}): Missing note ID or timestamp in JSON.`);
+                    }
+                } catch (parseError) {
+                    console.warn(`Failed to parse JSON for file ${originalFile.name} (ID: ${originalFile.id}):`, parseError);
+                }
+            } else {
+                 console.warn(`Failed to download content for file ID: ${originalFile.id}`);
+            }
+        }
+
+        console.log(`Successfully processed ${notesData.length} note files.`);
+
+        // 3. Group by note ID (from JSON content)
+        const notesGroupedById = notesData.reduce((acc, data) => {
+            acc[data.noteId] = acc[data.noteId] || [];
+            acc[data.noteId].push(data);
+            return acc;
+        }, {});
+
+        // 4. Identify duplicates and files to delete
+        const filesToDelete = [];
+        let duplicateSetsFound = 0;
+
+        for (const noteId in notesGroupedById) {
+            const group = notesGroupedById[noteId];
+            if (group.length > 1) {
+                duplicateSetsFound++;
+                console.log(`Found ${group.length} duplicates for note ID: ${noteId}`);
+
+                // Sort by noteUpdatedAt (desc), then driveModifiedTime (desc) as tie-breaker
+                group.sort((a, b) => {
+                    const dateA = new Date(a.noteUpdatedAt).getTime();
+                    const dateB = new Date(b.noteUpdatedAt).getTime();
+                    if (dateB !== dateA) return dateB - dateA; // Latest note date first
+                    // Tie-breaker: latest drive modification time
+                    const driveDateA = new Date(a.driveModifiedTime).getTime();
+                    const driveDateB = new Date(b.driveModifiedTime).getTime();
+                    return driveDateB - driveDateA;
+                });
+
+                const winner = group[0]; // The first element after sorting is the one to keep
+                console.log(` -> Winner (keeping): Drive File ID ${winner.driveFileId} (Updated: ${winner.noteUpdatedAt})`);
+
+                // Add all others in the group to the deletion list
+                for (let i = 1; i < group.length; i++) {
+                    filesToDelete.push(group[i].driveFileId);
+                    console.log(` -> Marked for deletion: Drive File ID ${group[i].driveFileId} (Updated: ${group[i].noteUpdatedAt})`);
+                }
+            }
+        }
+
+        // 5. Delete the identified duplicate files
+        if (filesToDelete.length > 0) {
+            console.log(`Attempting to delete ${filesToDelete.length} duplicate file(s)...`);
+            showToast(`Found ${filesToDelete.length} duplicate note(s). Cleaning up...`, 'info');
+
+            let deletedCount = 0;
+            // Delete sequentially to potentially avoid rate limits
+            for (const fileId of filesToDelete) {
+                try {
+                    await driveApi.deleteFile(fileId);
+                    console.log(` -> Successfully deleted Drive File ID: ${fileId}`);
+                    deletedCount++;
+                } catch (deleteError) {
+                    console.error(`Failed to delete Drive File ID: ${fileId}`, deleteError);
+                    // Decide if you want to stop or continue on error
+                }
+            }
+            console.log(`Successfully deleted ${deletedCount} out of ${filesToDelete.length} marked duplicates.`);
+            showToast(`Cleaned up ${deletedCount} duplicate note file(s).`, 'success');
+
+        } else if (duplicateSetsFound > 0) {
+             console.log('Duplicate sets found, but no files needed deletion (e.g., sorting resulted in keeping existing file).');
+             showToast('Duplicate check complete. No files required deletion.', 'success');
+        } else {
+            console.log('No duplicate note IDs found.');
+            showToast('No duplicate notes found.', 'success');
+        }
+
+    } catch (error) {
+        console.error('Error during Google Drive notes deduplication:', error);
+        showToast('Error checking for duplicate notes.', 'error');
+        // Don't throw here to avoid blocking initialization, just log/toast
+    }
+}
+
   const refreshToken = useCallback(async () => {
     console.log('Attempting token refresh...');
     let currentRefreshToken = refreshTokenValue;
