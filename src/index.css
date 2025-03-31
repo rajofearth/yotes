@@ -31,13 +31,12 @@
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
   }
-}
-
-@keyframes indeterminate {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(200%); }
-}
-
-.animate-indeterminate {
-  animation: indeterminate 1.5s infinite linear;
+    @keyframes indeterminate {
+    0% { transform: translateX(-100%) scaleX(0.5); } /* Start off-screen left, narrower */
+    50% { transform: translateX(0%) scaleX(1); }    /* Pass through center, full width */
+    100% { transform: translateX(100%) scaleX(0.5); } /* End off-screen right, narrower */
+  }
+  .animate-indeterminate {
+    animation: indeterminate 1.5s infinite linear; /* Adjust duration as needed */
+  }
 }
