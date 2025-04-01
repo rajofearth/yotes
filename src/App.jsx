@@ -1,69 +1,59 @@
-// src/App.jsx
-import React, { Suspense, lazy, useEffect, useState } from 'react';
+import React, { Suspense, lazy, useEffect, useState, useRef } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Analytics } from '@vercel/analytics/react';
 import { supabase } from './utils/supabaseClient';
 import { GoogleDriveProvider, useGoogleDrive } from './contexts/GoogleDriveContext';
 import { ToastProvider } from './contexts/ToastContext';
-import { NotesProvider, useNotes } from './contexts/NotesContext'; // Ensure useNotes is imported
+import { NotesProvider, useNotes } from './contexts/NotesContext';
 
-// Page Imports
 import Home from './pages/home';
-import Login from './pages/login'; // Adjusted path based on structure
-import AuthCallback from './pages/auth/callback'; // Adjusted path
-import ViewNote from './pages/note/view/[id]'; // Adjusted path
-import NoteEditor from './pages/note/NoteEditor'; // Adjusted path
-
-// Lazy Loaded Pages
-const Settings = lazy(() => import('./pages/settings'));
+import Login from './pages/login';
+import AuthCallback from './pages/auth/callback';
+import Settings from './pages/settings';
 const SectionView = lazy(() => import('./pages/section/[id]'));
-
-// Component Imports
+const ViewNote = lazy(() => import('./pages/note/view/[id]'));
+const NoteEditor = lazy(() => import('./pages/note/NoteEditor'));
 import ErrorBoundary from './components/ErrorBoundary';
 import ProgressBar from './components/ProgressBar';
+import PWAReloadPrompt from './components/PWAReloadPrompt';
 
-// AppContent receives isInitialLoad state and the setter
 function AppContent({ session, isAuthLoading, isInitialLoad, setIsInitialLoad }) {
-  // These hooks provide granular loading states
-  const { isLoading: isDriveLoading, error: driveError } = useGoogleDrive(); // Get drive error
-  const { isLoading: isNotesLoading, isInitialSync, loadingState, error: notesError } = useNotes(); // Get notes error
+  const { isLoading: isDriveLoading, error: driveError } = useGoogleDrive();
+  const { isLoading: isNotesLoading, isInitialSync, loadingState, error: notesError } = useNotes();
+  const initialLoadCompletedRef = useRef(false);
 
-  // This effect correctly determines when the *entire initial load* is complete
   useEffect(() => {
-    // --- *** KEY CHANGE *** ---
-    // Only proceed if we are currently in the initial load phase
-    if (isInitialLoad) {
-        const allLoadingComplete = !isAuthLoading && !isDriveLoading && !isNotesLoading && !isInitialSync;
-        const hasCriticalError = driveError || notesError;
+    const allLoadingComplete = !isAuthLoading && !isDriveLoading && !isNotesLoading && !isInitialSync;
+    const hasCriticalError = driveError || notesError;
 
-        if (allLoadingComplete) {
-            // If all loading is done AND there are no critical errors, mark initial load as finished.
-            if (!hasCriticalError) {
-                console.log('AppContent Effect: All initial loading complete, setting isInitialLoad to false');
-                setIsInitialLoad(false);
-            } else {
-                // If loading finished but with errors, log it.
-                // The error screen will be shown by the render logic below based on hasCriticalError.
-                // We still set isInitialLoad to false so the main app routes *try* to render,
-                // allowing the error screen within AppContent's render logic to take over.
-                console.warn('AppContent Effect: Initial loading technically finished, but with errors. Setting isInitialLoad to false to show error screen.');
-                 setIsInitialLoad(false);
-            }
-        }
-        // If still loading, do nothing, wait for the next effect run when states change.
+    if (isInitialLoad && allLoadingComplete && !initialLoadCompletedRef.current) {
+      if (!hasCriticalError) {
+        // console.log('AppContent Effect: *** Initial Load Sequence Complete *** Setting isInitialLoad to false.');
+        setIsInitialLoad(false);
+        initialLoadCompletedRef.current = true;
+      } else {
+        // console.warn('AppContent Effect: Initial loading finished, but with critical errors. Setting isInitialLoad to false to show error screen.');
+        setIsInitialLoad(false);
+        initialLoadCompletedRef.current = true;
+      }
     }
-    // Dependencies: Re-run when any loading state, error state, or isInitialLoad itself changes.
-  }, [isAuthLoading, isDriveLoading, isNotesLoading, isInitialSync, driveError, notesError, isInitialLoad, setIsInitialLoad]);
+  }, [
+      isAuthLoading,
+      isDriveLoading,
+      isNotesLoading,
+      isInitialSync,
+      driveError,
+      notesError,
+      isInitialLoad,
+      setIsInitialLoad
+  ]);
 
   // --- Render Logic ---
 
-  // 1. Show progress bar during initial Authentication Check
   if (isAuthLoading) {
-    // Use indeterminate progress for auth check
     return <ProgressBar progress={-1} message="Checking authentication..." />;
   }
 
-  // 2. Handle No Session (Redirect to Login)
   if (!session) {
     return (
       <Routes>
@@ -74,11 +64,9 @@ function AppContent({ session, isAuthLoading, isInitialLoad, setIsInitialLoad })
     );
   }
 
-  // 3. Show progress bar OR error screen ONLY if the overall initial load is NOT yet complete
   if (isInitialLoad) {
-     // Check for critical init errors FIRST
-     if (driveError || notesError) {
-         // Render the dedicated error screen
+     const hasCriticalError = driveError || notesError;
+     if (hasCriticalError) {
          return (
              <div className="min-h-screen bg-bg-primary flex flex-col items-center justify-center p-4 text-center">
                  <h1 className="text-2xl font-semibold text-red-500 mb-4">Initialization Error</h1>
@@ -92,24 +80,20 @@ function AppContent({ session, isAuthLoading, isInitialLoad, setIsInitialLoad })
                   </button>
              </div>
          );
+     } else {
+         return (
+           <ProgressBar
+             progress={loadingState?.progress ?? (isDriveLoading ? 30 : 10)}
+             message={loadingState?.message ?? (isDriveLoading ? 'Connecting Drive...' : 'Initializing...')}
+           />
+         );
      }
-     // Otherwise, show the progress bar with details from loadingState
-    return (
-      <ProgressBar
-        // Use loadingState from useNotes context for progress/message
-        progress={loadingState?.progress ?? (isDriveLoading ? 30 : 10)} // Provide fallback progress
-        message={loadingState?.message ?? (isDriveLoading ? 'Connecting Drive...' : 'Initializing...')}
-      />
-    );
   }
 
-  // 4. Initial Load is Complete: Render the main application
-  //    Subsequent loading (e.g., background syncs via isNotesLoading) won't trigger the main progress bar
+  // --- Initial Load Complete ---
   return (
     <ErrorBoundary fallback={<div>Something went wrong! Try refreshing.</div>}>
       <Suspense fallback={<ProgressBar progress={-1} message="Loading page..." />}>
-        {/* Optional: Add a subtle indicator for background syncs if needed */}
-        {/* {isNotesLoading && !isInitialSync && <div className="fixed top-0 left-0 w-full h-1 bg-blue-500 animate-pulse z-[999]"></div>} */}
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/note/edit/:id" element={<NoteEditor />} />
@@ -117,91 +101,91 @@ function AppContent({ session, isAuthLoading, isInitialLoad, setIsInitialLoad })
           <Route path="/settings" element={<Settings />} />
           <Route path="/section/:id" element={<SectionView />} />
           <Route path="/create" element={<NoteEditor />} />
-          {/* Redirect authenticated users away from login */}
           <Route path="/login" element={<Navigate to="/" replace />} />
-          <Route path="/auth/callback" element={<AuthCallback />} /> {/* Keep callback */}
-          <Route path="*" element={<Navigate to="/" replace />} /> {/* Catch-all */}
+          <Route path="/auth/callback" element={<AuthCallback />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>
     </ErrorBoundary>
   );
 }
 
-// App component manages the top-level isInitialLoad state
 function App() {
   const [session, setSession] = useState(null);
-  const [isAuthLoading, setIsAuthLoading] = useState(true); // Renamed from isLoading for clarity
-  const [isInitialLoad, setIsInitialLoad] = useState(true); // Tracks the ENTIRE initial app load sequence
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
 
   useEffect(() => {
     let mounted = true;
-    console.log('App mounted. Setting up session check and auth listener.');
+    // console.log('App mounted. Setting up session check and auth listener.');
 
-    // Initial Session Check
     supabase.auth.getSession().then(({ data: { session: currentSession }, error }) => {
       if (mounted) {
         if (error) {
-          console.error('Error fetching initial session:', error);
+          // console.error('App Effect: Error fetching initial session:', error);
           setSession(null);
-          setIsInitialLoad(false); // No session, no initial load needed
+          setIsInitialLoad(false);
         } else {
-          console.log('Initial session fetched:', !!currentSession);
+          // console.log('App Effect: Initial session fetched:', !!currentSession);
           setSession(currentSession);
-          // If there's no session initially, the initial load doesn't involve Drive/Notes
-          // If there IS a session, we NEED to perform the initial load sequence.
           setIsInitialLoad(!!currentSession);
         }
-        setIsAuthLoading(false); // Authentication check is complete regardless of session presence
+        setIsAuthLoading(false);
+        // console.log(`App Effect: Initial auth check complete. isAuthLoading=false, isInitialLoad=${!!currentSession}`);
       }
     }).catch(err => {
          if (mounted) {
-            console.error('Exception fetching initial session:', err);
+            // console.error('App Effect: Exception fetching initial session:', err);
             setSession(null);
             setIsAuthLoading(false);
-            setIsInitialLoad(false); // Error means we can't proceed with initial load
+            setIsInitialLoad(false);
          }
     });
 
-    // Auth State Change Listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, newSession) => {
        if (!mounted) return;
-        console.log('Auth state changed:', event, !!newSession);
-        setSession(newSession);
-        setIsAuthLoading(false); // Any auth change means auth check is resolved
+        // console.log(`App Effect: Auth state changed: ${event}`, !!newSession);
+        const wasPreviouslyAuthenticated = !!session;
+        const isNowAuthenticated = !!newSession;
 
-        // Reset isInitialLoad appropriately based on the event
-        if (event === 'SIGNED_IN') {
-            console.log("Auth: SIGNED_IN - Resetting isInitialLoad to true");
-            setIsInitialLoad(true); // Start the initial load process for the new session
+        setSession(newSession);
+        setIsAuthLoading(false);
+
+        if (event === 'SIGNED_IN' && !wasPreviouslyAuthenticated) {
+            // console.log("App Effect: Auth SIGNED_IN (from unauth) -> Resetting isInitialLoad = true");
+            setIsInitialLoad(true);
         } else if (event === 'SIGNED_OUT') {
-            console.log("Auth: SIGNED_OUT - Setting isInitialLoad to false");
-            setIsInitialLoad(false); // No initial load needed when signed out
+            // console.log("App Effect: Auth SIGNED_OUT -> Setting isInitialLoad = false");
+            setIsInitialLoad(false);
+        } else if (event === 'INITIAL_SESSION' && isNowAuthenticated && !isInitialLoad) {
+             // Handles case where INITIAL_SESSION arrives after getSession, confirming auth
+             // console.log("App Effect: Auth INITIAL_SESSION (auth confirmed) -> Setting isInitialLoad = true");
+             setIsInitialLoad(true);
+        } else if (event === 'INITIAL_SESSION' && !isNowAuthenticated) {
+             // console.log("App Effect: Auth INITIAL_SESSION (unauth confirmed) -> Setting isInitialLoad = false");
+             setIsInitialLoad(false);
         }
-        // For TOKEN_REFRESHED or USER_UPDATED, isInitialLoad status should generally remain unchanged
-        // unless the session becomes invalid, which would trigger SIGNED_OUT.
     });
 
-    // Cleanup
     return () => {
       mounted = false;
-      console.log('App unmounting. Unsubscribing auth listener.');
+      // console.log('App unmounting. Unsubscribing auth listener.');
       subscription?.unsubscribe();
     };
-  }, []); // Run only once on App mount
+  }, []); // Keep empty
 
   return (
     <ToastProvider>
       <Router>
-        {/* Pass session ONLY IF auth is resolved */}
-        {/* Pass undefined during auth load to prevent providers from initializing prematurely */}
         <GoogleDriveProvider session={!isAuthLoading ? session : undefined}>
           <NotesProvider session={!isAuthLoading ? session : undefined}>
             <AppContent
               session={session}
               isAuthLoading={isAuthLoading}
               isInitialLoad={isInitialLoad}
-              setIsInitialLoad={setIsInitialLoad} // Pass down setter
+              setIsInitialLoad={setIsInitialLoad}
             />
+            <PWAReloadPrompt />
             <Analytics />
           </NotesProvider>
         </GoogleDriveProvider>
