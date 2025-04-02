@@ -49,7 +49,7 @@ export default defineConfig({
         icons: [
             { src: 'android-chrome-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
             { src: 'android-chrome-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
-            { src: 'maskable-icon-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+            { src: 'maskable-icon-x512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
             { src: 'maskable_icon_x48.png', sizes: "48x48", type: "image/png", purpose: "maskable" },
             { src: 'maskable_icon_x72.png', sizes: "72x72", type: "image/png", purpose: "maskable" },
             { src: 'maskable_icon_x96.png', sizes: "96x96", type: "image/png", purpose: "maskable" },
@@ -59,10 +59,40 @@ export default defineConfig({
             { src: 'apple-touch-icon.png', sizes: '180x180', type: 'image/png', purpose: 'any' }
         ],
         shortcuts: [
-          { name: 'New Note', short_name: 'New', description: 'Create a new note in Yotes', url: '/create', icons: [{ src: 'favicon-32x32.png', sizes: '32x32' }] },
-          { name: "Settings", url: "/settings", description: "Open Yotes settings" }
+          { name: 'New Note', short_name: 'New', description: 'Create a new note in Yotes', url: '/create', icons: [{ src: 'favicon-96x96.png', sizes: '96x96' }] },
+          { name: "Settings", url: "/settings", description: "Open Yotes settings", icons: [{ src: 'favicon-96x96.png', sizes: '96x96' }
         ],
         orientation: 'portrait-primary',
+        screenshots: [
+          {
+            "src": "screenshot-desktop-1.png",
+            "sizes": "1280x720",
+            "type": "image/png",
+            "form_factor": "wide",
+            "label": "Desktop Notes View"
+          },
+          {
+            "src": "screenshot-desktop-2.png", 
+            "sizes": "1280x720",
+            "type": "image/png",
+            "form_factor": "wide",
+            "label": "Desktop Settings View"
+          },
+          {
+            "src": "screenshot-mobile-1.png", 
+            "sizes": "540x720",
+            "type": "image/png",
+            "form_factor": "narrow", 
+            "label": "Mobile Notes View"
+          },
+          {
+            "src": "screenshot-mobile-2.png", 
+            "sizes": "540x720",
+            "type": "image/png",
+            "form_factor": "narrow", // For mobile (or omit form_factor)
+            "label": "Mobile Settings View"
+          }
+        ],
       },
       includeAssets: ['favicon.ico', 'apple-touch-icon.png'],
     })
