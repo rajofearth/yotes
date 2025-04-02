@@ -6,13 +6,15 @@ import { GoogleDriveProvider, useGoogleDrive } from './contexts/GoogleDriveConte
 import { ToastProvider } from './contexts/ToastContext';
 import { NotesProvider, useNotes } from './contexts/NotesContext';
 
+import ViewNote from './pages/note/view/[id]';
 import Home from './pages/home';
 import Login from './pages/login';
 import AuthCallback from './pages/auth/callback';
 import Settings from './pages/settings';
+
 const SectionView = lazy(() => import('./pages/section/[id]'));
-const ViewNote = lazy(() => import('./pages/note/view/[id]'));
 const NoteEditor = lazy(() => import('./pages/note/NoteEditor'));
+
 import ErrorBoundary from './components/ErrorBoundary';
 import ProgressBar from './components/ProgressBar';
 import PWAReloadPrompt from './components/PWAReloadPrompt';
