@@ -60,8 +60,14 @@ export default defineConfig({
         ],
         shortcuts: [
           { name: 'New Note', short_name: 'New', description: 'Create a new note in Yotes', url: '/create', icons: [{ src: 'favicon-96x96.png', sizes: '96x96' }] },
-          { name: "Settings", url: "/settings", description: "Open Yotes settings", icons: [{ src: 'favicon-96x96.png', sizes: '96x96' }
+          {
+            name: "Settings",
+            url: "/settings",
+            description: "Open Yotes settings",
+            icons: [{ src: 'favicon-96x96.png', sizes: '96x96' }] 
+          } 
         ],
+
         orientation: 'portrait-primary',
         screenshots: [
           {
@@ -72,21 +78,21 @@ export default defineConfig({
             "label": "Desktop Notes View"
           },
           {
-            "src": "screenshot-desktop-2.png", 
+            "src": "screenshot-desktop-2.png",
             "sizes": "1280x720",
             "type": "image/png",
             "form_factor": "wide",
             "label": "Desktop Settings View"
           },
           {
-            "src": "screenshot-mobile-1.png", 
+            "src": "screenshot-mobile-1.png",
             "sizes": "540x720",
             "type": "image/png",
-            "form_factor": "narrow", 
+            "form_factor": "narrow",
             "label": "Mobile Notes View"
           },
           {
-            "src": "screenshot-mobile-2.png", 
+            "src": "screenshot-mobile-2.png",
             "sizes": "540x720",
             "type": "image/png",
             "form_factor": "narrow", // For mobile (or omit form_factor)
