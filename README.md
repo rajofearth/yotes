@@ -25,9 +25,9 @@ From Yashraj’s rough TODO list, here’s what’s in the pipeline:
 - [x] Improved loading indicators with timestamps on note cards.
 - [x] Tag creation fix for mobile devices.
 - [ ] Static pages: Homepage, Privacy Policy, and Terms & Conditions.
-- [ ] Caching for account details and offline access.
+- [x] Caching for account details and offline access.
 - [ ] Export/import functionality.
-- [ ] Progressive Web App (PWA) support.
+- [x] Progressive Web App (PWA) support.
 - [ ] PDF viewer and download capabilities.
 - [ ] Rich previews for links (e.g., website showcases, YouTube embeds).
 - [ ] AI-powered description generator and search summaries.
@@ -85,29 +85,6 @@ From Yashraj’s rough TODO list, here’s what’s in the pipeline:
 4. **Search & Filter**: Use the search bar or tag filters on the homepage.
 5. **Track Activity**: Check your note heatmap in Settings.
 6. **Manage Account**: Log out or delete your account from Settings.
-
-## Project Structure
-
-```
-yotes/
-├── src/
-│   ├── components/        # UI components (e.g., NavBar, NoteCard)
-│   ├── contexts/         # Contexts for state (e.g., GoogleDriveContext)
-│   ├── data/            # Sample data (notes.json, tags.json)
-│   ├── hooks/          # Custom hooks (e.g., useNotes)
-│   ├── lib/           # Utilities (e.g., className helpers)
-│   ├── pages/         # Page components (e.g., Home, Settings)
-│   ├── styles/        # Custom CSS (e.g., heatmap.css)
-│   ├── utils/         # Helpers (e.g., googleDrive.js)
-│   ├── App.jsx         # Router setup
-│   ├── index.css       # Global styles with Tailwind
-│   └── main.jsx        # Entry point
-├── .gitignore          # Ignored files
-├── package.json        # Dependencies
-├── tailwind.config.js  # Tailwind config
-├── vite.config.js      # Vite config
-└── README.md           # This file
-```
 
 ## Development
 

@@ -2,61 +2,95 @@ import React, { Suspense, lazy, useEffect, useState, useRef } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Analytics } from '@vercel/analytics/react';
 import { supabase } from './utils/supabaseClient';
-import { GoogleDriveProvider, useGoogleDrive } from './contexts/GoogleDriveContext';
-import { ToastProvider } from './contexts/ToastContext';
+import {
+  GoogleDriveProvider,
+  useGoogleDrive,
+} from './contexts/GoogleDriveContext';
+import { ToastProvider, useToast } from './contexts/ToastContext';
 import { NotesProvider, useNotes } from './contexts/NotesContext';
-
+import { useOnlineStatus } from './contexts/OnlineStatusContext';
+import { OfflineBadge } from './components/OfflineBadge';
+import { SyncTriggerBadge } from './components/SyncTriggerBadge';
+import { SyncProgressOverlay } from './components/SyncProgressOverlay';
 import ViewNote from './pages/note/view/[id]';
 import Home from './pages/home';
-import Login from './pages/login';
+import Login from './pages/auth/login'; // Ensure correct path
 import AuthCallback from './pages/auth/callback';
 import Settings from './pages/settings';
-
 const SectionView = lazy(() => import('./pages/section/[id]'));
 const NoteEditor = lazy(() => import('./pages/note/NoteEditor'));
-
 import ErrorBoundary from './components/ErrorBoundary';
 import ProgressBar from './components/ProgressBar';
 import PWAReloadPrompt from './components/PWAReloadPrompt';
+import SyncButton from './components/SyncButton';
 
 function AppContent({ session, isAuthLoading, isInitialLoad, setIsInitialLoad }) {
+  const isOnline = useOnlineStatus();
+  const showToast = useToast();
   const { isLoading: isDriveLoading, error: driveError } = useGoogleDrive();
-  const { isLoading: isNotesLoading, isInitialSync, loadingState, error: notesError } = useNotes();
+  const {
+    isLoading: isNotesLoading, // This now primarily reflects cache loading state
+    isInitialSync, // Reflects the full initial load sequence (cache + optional drive)
+    loadingState,
+    error: notesError,
+    manualSyncWithDrive,
+    isManualSyncing,
+    syncProgressMessage,
+    hasPendingChanges,
+  } = useNotes();
   const initialLoadCompletedRef = useRef(false);
+  const firstOfflineToastShown = useRef(false);
 
+  // Show offline messages
   useEffect(() => {
-    const allLoadingComplete = !isAuthLoading && !isDriveLoading && !isNotesLoading && !isInitialSync;
-    const hasCriticalError = driveError || notesError;
-
-    if (isInitialLoad && allLoadingComplete && !initialLoadCompletedRef.current) {
-      if (!hasCriticalError) {
-        // console.log('AppContent Effect: *** Initial Load Sequence Complete *** Setting isInitialLoad to false.');
-        setIsInitialLoad(false);
-        initialLoadCompletedRef.current = true;
-      } else {
-        // console.warn('AppContent Effect: Initial loading finished, but with critical errors. Setting isInitialLoad to false to show error screen.');
-        setIsInitialLoad(false);
-        initialLoadCompletedRef.current = true;
+    if (session && !isOnline) {
+      if (!firstOfflineToastShown.current) {
+        setTimeout(() => {
+          showToast('You are currently offline.', 'info');
+          setTimeout(() => showToast('Changes are saved locally.', 'info'), 500);
+          firstOfflineToastShown.current = true;
+        }, 1000);
       }
+    } else if (session && isOnline) {
+      firstOfflineToastShown.current = false; // Reset when back online
     }
-  }, [
-      isAuthLoading,
-      isDriveLoading,
-      isNotesLoading,
-      isInitialSync,
-      driveError,
-      notesError,
-      isInitialLoad,
-      setIsInitialLoad
-  ]);
+  }, [isOnline, session, showToast]);
+
+  // Listen for global online/offline events
+  useEffect(() => {
+    const handleOffline = () => {
+      console.log('App: Detected offline status via global event');
+      if (isInitialLoad) {
+        setIsInitialLoad(false);
+      }
+    };
+    
+    window.addEventListener('app:offline', handleOffline);
+    
+    return () => {
+      window.removeEventListener('app:offline', handleOffline);
+    };
+  }, [isInitialLoad, setIsInitialLoad]);
+
+  // Determine overall initial loading status
+  const stillLoading = isAuthLoading || isInitialSync || isNotesLoading;
+
+  // Manage isInitialLoad state based on combined loading status
+  useEffect(() => {
+     if (!stillLoading && !initialLoadCompletedRef.current) {
+        setIsInitialLoad(false);
+        initialLoadCompletedRef.current = true;
+     }
+  }, [stillLoading, setIsInitialLoad]);
+
 
   // --- Render Logic ---
-
   if (isAuthLoading) {
     return <ProgressBar progress={-1} message="Checking authentication..." />;
   }
 
   if (!session) {
+    // Routes for logged-out users
     return (
       <Routes>
         <Route path="/login" element={<Login />} />
@@ -66,36 +100,75 @@ function AppContent({ session, isAuthLoading, isInitialLoad, setIsInitialLoad })
     );
   }
 
-  if (isInitialLoad) {
-     const hasCriticalError = driveError || notesError;
-     if (hasCriticalError) {
-         return (
-             <div className="min-h-screen bg-bg-primary flex flex-col items-center justify-center p-4 text-center">
-                 <h1 className="text-2xl font-semibold text-red-500 mb-4">Initialization Error</h1>
-                 <p className="text-text-primary/80 mb-2">Could not load required data.</p>
-                 <p className="text-sm text-text-primary/60 mb-6">{(driveError || notesError)?.message || 'Unknown error'}</p>
-                 <button
-                    onClick={() => window.location.reload()}
-                    className="mt-4 bg-overlay/10 hover:bg-overlay/20 px-4 py-2 rounded text-text-primary"
-                  >
-                    Retry
-                  </button>
-             </div>
-         );
-     } else {
-         return (
+  // Logged In: Show Initial Loading / Error / App
+  if (isInitialLoad || isNotesLoading /* Also check isNotesLoading for cache phase */) {
+    const hasCriticalError = driveError || notesError;
+    
+    // Immediately exit loading state when offline
+    if (!isOnline) {
+      // Force immediate end of loading without timeout
+      if (isInitialLoad) {
+        setIsInitialLoad(false);
+        initialLoadCompletedRef.current = true;
+      }
+      
+      return (
+        <>
+          <ProgressBar
+            progress={100}
+            message="Using offline data"
+          />
+          <OfflineBadge />
+        </>
+      );
+    }
+    
+    if (hasCriticalError && !isNotesLoading /* Show error only after cache attempt */) {
+      return (
+        <div className="min-h-screen bg-bg-primary flex flex-col items-center justify-center p-4 text-center">
+          <h1 className="text-2xl font-semibold text-red-500 mb-4">
+            Initialization Error
+          </h1>
+          <p className="text-text-primary/80 mb-2">
+            Could not load required data.
+          </p>
+          <p className="text-sm text-text-primary/60 mb-6">
+            {(driveError || notesError)?.message || 'Unknown error'}
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-4 bg-overlay/10 hover:bg-overlay/20 px-4 py-2 rounded text-text-primary"
+          >
+            Retry
+          </button>
+          <OfflineBadge />
+        </div>
+      );
+    } else {
+      // Show progress bar during cache load OR initial drive check
+       return (
+         <>
            <ProgressBar
-             progress={loadingState?.progress ?? (isDriveLoading ? 30 : 10)}
-             message={loadingState?.message ?? (isDriveLoading ? 'Connecting Drive...' : 'Initializing...')}
+             progress={loadingState?.progress ?? (isDriveLoading ? 40 : (isNotesLoading ? 15 : 5))}
+             message={loadingState?.message ?? (isDriveLoading ? 'Connecting Drive...' : (isNotesLoading ? 'Loading Notes...' : 'Initializing...'))}
            />
-         );
-     }
+           <OfflineBadge />
+         </>
+       );
+    }
   }
 
-  // --- Initial Load Complete ---
+  // --- Initial Load Complete - Show App ---
   return (
     <ErrorBoundary fallback={<div>Something went wrong! Try refreshing.</div>}>
-      <Suspense fallback={<ProgressBar progress={-1} message="Loading page..." />}>
+      <SyncProgressOverlay
+        isSyncing={isManualSyncing}
+        message={syncProgressMessage}
+      />
+
+      <Suspense
+        fallback={<ProgressBar progress={-1} message="Loading page..." />}
+      >
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/note/edit/:id" element={<NoteEditor />} />
@@ -104,77 +177,87 @@ function AppContent({ session, isAuthLoading, isInitialLoad, setIsInitialLoad })
           <Route path="/section/:id" element={<SectionView />} />
           <Route path="/create" element={<NoteEditor />} />
           <Route path="/login" element={<Navigate to="/" replace />} />
-          <Route path="/auth/callback" element={<AuthCallback />} />
+          <Route path="/auth/callback" element={<Navigate to="/" replace />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>
+      <OfflineBadge />
+      <SyncTriggerBadge
+        hasPending={hasPendingChanges}
+        onSync={manualSyncWithDrive}
+        isSyncing={isManualSyncing}
+      />
+      <SyncButton />
     </ErrorBoundary>
   );
 }
 
 function App() {
+  const isOnline = useOnlineStatus();
   const [session, setSession] = useState(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
-  const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [isInitialLoad, setIsInitialLoad] = useState(true); // Tracks the whole sequence
 
   useEffect(() => {
     let mounted = true;
-    // console.log('App mounted. Setting up session check and auth listener.');
-
-    supabase.auth.getSession().then(({ data: { session: currentSession }, error }) => {
-      if (mounted) {
-        if (error) {
-          // console.error('App Effect: Error fetching initial session:', error);
-          setSession(null);
-          setIsInitialLoad(false);
-        } else {
-          // console.log('App Effect: Initial session fetched:', !!currentSession);
+    // Check initial session
+    supabase.auth
+      .getSession()
+      .then(({ data: { session: currentSession }, error }) => {
+        if (mounted) {
+          if (error) console.error('App: Error fetching initial session:', error);
           setSession(currentSession);
+          // Only set isInitialLoad true if there *is* a session to load data for
           setIsInitialLoad(!!currentSession);
+          setIsAuthLoading(false);
         }
-        setIsAuthLoading(false);
-        // console.log(`App Effect: Initial auth check complete. isAuthLoading=false, isInitialLoad=${!!currentSession}`);
+      })
+      .catch((err) => {
+        if (mounted) {
+          console.error('App: Exception fetching initial session:', err);
+          setSession(null); setIsAuthLoading(false); setIsInitialLoad(false);
+        }
+      });
+
+    // Listen for auth changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, newSession) => {
+      if (!mounted) return;
+      const wasAuth = !!session;
+      const isAuth = !!newSession;
+      setSession(newSession);
+      setIsAuthLoading(false); // Auth state confirmed
+
+      if (event === 'SIGNED_IN' && !wasAuth) setIsInitialLoad(true); // Start load sequence
+      else if (event === 'SIGNED_OUT') setIsInitialLoad(false); // Stop load sequence
+      else if ((event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') && isAuth && !wasAuth && !isInitialLoad) {
+          // Handles cases where auth is confirmed after initial getSession check maybe failed
+          setIsInitialLoad(true);
+      } else if (!isAuth) {
+          setIsInitialLoad(false); // Ensure false if not authenticated
       }
-    }).catch(err => {
-         if (mounted) {
-            // console.error('App Effect: Exception fetching initial session:', err);
-            setSession(null);
-            setIsAuthLoading(false);
-            setIsInitialLoad(false);
-         }
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, newSession) => {
-       if (!mounted) return;
-        // console.log(`App Effect: Auth state changed: ${event}`, !!newSession);
-        const wasPreviouslyAuthenticated = !!session;
-        const isNowAuthenticated = !!newSession;
+    return () => { mounted = false; subscription?.unsubscribe(); };
+  }, []); // Empty dependency array is correct here
 
-        setSession(newSession);
-        setIsAuthLoading(false);
-
-        if (event === 'SIGNED_IN' && !wasPreviouslyAuthenticated) {
-            // console.log("App Effect: Auth SIGNED_IN (from unauth) -> Resetting isInitialLoad = true");
-            setIsInitialLoad(true);
-        } else if (event === 'SIGNED_OUT') {
-            // console.log("App Effect: Auth SIGNED_OUT -> Setting isInitialLoad = false");
-            setIsInitialLoad(false);
-        } else if (event === 'INITIAL_SESSION' && isNowAuthenticated && !isInitialLoad) {
-             // Handles case where INITIAL_SESSION arrives after getSession, confirming auth
-             // console.log("App Effect: Auth INITIAL_SESSION (auth confirmed) -> Setting isInitialLoad = true");
-             setIsInitialLoad(true);
-        } else if (event === 'INITIAL_SESSION' && !isNowAuthenticated) {
-             // console.log("App Effect: Auth INITIAL_SESSION (unauth confirmed) -> Setting isInitialLoad = false");
-             setIsInitialLoad(false);
-        }
-    });
-
-    return () => {
-      mounted = false;
-      // console.log('App unmounting. Unsubscribing auth listener.');
-      subscription?.unsubscribe();
-    };
-  }, []); // Keep empty
+  // Early return for logged out + offline
+  if (!isAuthLoading && !session && !isOnline) {
+    return (
+      <ToastProvider>
+        <div className="min-h-screen bg-bg-primary flex flex-col items-center justify-center p-4 text-center">
+          <h1 className="text-xl font-semibold text-text-primary mb-4">
+            Offline
+          </h1>
+          <p className="text-text-primary/80">
+            Please connect to the internet to log in or sign up.
+          </p>
+        </div>
+        <OfflineBadge />
+      </ToastProvider>
+    );
+  }
 
   return (
     <ToastProvider>

@@ -21,6 +21,8 @@ export const SAMPLE_TAGS = [
     }
 ];
 
+import { getFromDB, setInDB } from './indexedDB';
+
 export class DriveStructureManager {
     constructor(driveApi) {
         this.driveApi = driveApi;
@@ -29,6 +31,24 @@ export class DriveStructureManager {
 
     async initializeStructure() {
         try {
+            // Check if we're online
+            const isOnline = navigator.onLine;
+            
+            // Try to get cached folder IDs first
+            const cachedFolderIds = await getFromDB('sessions', 'folder_ids');
+            
+            // If offline and we have cached folder IDs, use them
+            if (!isOnline) {
+                if (cachedFolderIds) {
+                    console.log('Using cached folder IDs due to offline status');
+                    this.folderIds = cachedFolderIds;
+                    return cachedFolderIds;
+                } else {
+                    throw new Error('No cached folder structure available while offline');
+                }
+            }
+            
+            // Online flow - continue with normal initialization
             // First check if root folder exists - if it does, user is not new
             const existingRoot = await this.findFolder(DRIVE_FOLDER_NAMES.ROOT);
             const isNewUser = !existingRoot;
@@ -44,6 +64,9 @@ export class DriveStructureManager {
             this.folderIds.notes = notesFolder.id;
             this.folderIds.tags = tagsFolder.id;
 
+            // Cache the folder IDs for offline use
+            await setInDB('sessions', 'folder_ids', this.folderIds);
+
             // Only create sample content for new users
             if (isNewUser) {
                 await this.createSampleContent();
@@ -57,33 +80,56 @@ export class DriveStructureManager {
     }
 
     async findFolder(name, parentId = null) {
-        const query = `name = '${name}' and mimeType = 'application/vnd.google-apps.folder'${
-            parentId ? ` and '${parentId}' in parents` : ''
-        }`;
-        const url = new URL(`${this.driveApi.baseUrl}/files`);
-        url.searchParams.append('q', query);
-        url.searchParams.append('fields', 'files(id, name)');
+        if (!navigator.onLine) {
+            throw new Error('Cannot search for folders while offline');
+        }
+        
+        try {
+            const query = `name = '${name}' and mimeType = 'application/vnd.google-apps.folder'${
+                parentId ? ` and '${parentId}' in parents` : ''
+            }`;
+            const url = new URL(`${this.driveApi.baseUrl}/files`);
+            url.searchParams.append('q', query);
+            url.searchParams.append('fields', 'files(id, name)');
 
-        const response = await fetch(url, {
-            headers: {
-                'Authorization': `Bearer ${this.driveApi.accessToken}`
+            const response = await fetch(url, {
+                headers: {
+                    'Authorization': `Bearer ${this.driveApi.accessToken}`
+                }
+            });
+
+            const { files } = await response.json();
+            return files[0] || null;
+        } catch (error) {
+            if (!navigator.onLine) {
+                console.error('Network error while offline:', error);
+                throw new Error('Cannot search for folders while offline');
             }
-        });
-
-        const { files } = await response.json();
-        return files[0] || null;
+            throw error;
+        }
     }
 
     async createFolder(name, parentId = null) {
+        if (!navigator.onLine) {
+            throw new Error('Cannot create folders while offline');
+        }
         return this.driveApi.createFolder(name, parentId);
     }
 
     async findOrCreateFolder(name, parentId = null) {
+        if (!navigator.onLine) {
+            throw new Error('Cannot find or create folders while offline');
+        }
         const existing = await this.findFolder(name, parentId);
         return existing || await this.createFolder(name, parentId);
     }
 
     async createSampleContent() {
+        if (!navigator.onLine) {
+            console.log('Skipping sample content creation while offline');
+            return;
+        }
+        
         try {
             // Check if sample note already exists
             const notesResponse = await this.driveApi.listFiles(this.folderIds.notes);

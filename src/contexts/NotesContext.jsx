@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, useCallback } from 'rea
 import { useGoogleDrive } from './GoogleDriveContext';
 import { setInDB, getFromDB, pullChangesFromDrive, NOTES_STORE, TAGS_STORE } from '../utils/indexedDB';
 import { DRIVE_FOLDER_NAMES } from '../utils/driveStructure';
+import { useOnlineStatus } from './OnlineStatusContext';
 
 export const NotesContext = createContext();
 
@@ -14,6 +15,7 @@ export function NotesProvider({ children, session }) {
     const [isInitialSync, setIsInitialSync] = useState(true);
     const [loadingState, setLoadingState] = useState({ progress: 0, message: 'Initializing...' });
     const { driveApi, folderIds } = useGoogleDrive();
+    const isOnline = useOnlineStatus();
 
     // Function to remove duplicates and clean up storage
     const deduplicateNotes = useCallback(async (notesList) => {
@@ -39,24 +41,28 @@ export function NotesProvider({ children, session }) {
 
         const uniqueNotes = Array.from(noteMap.values());
 
-        if (duplicates.length > 0) {
+        if (duplicates.length > 0 && isOnline) {
             console.log(`Found ${duplicates.length} duplicate notes to delete:`, duplicates.map(d => d.id));
-            // Delete duplicates from Google Drive
-            await Promise.all(
-                duplicates.map(async (note) => {
-                    try {
-                        const fileName = `${note.id}.json`;
-                        const filesResponse = await driveApi.listFiles(folderIds.notes);
-                        const file = filesResponse.files.find(f => f.name === fileName);
-                        if (file) {
-                            await driveApi.deleteFile(file.id);
-                            console.log(`Deleted duplicate note ${note.id} from Google Drive`);
+            // Delete duplicates from Google Drive - skip if offline
+            try {
+                await Promise.all(
+                    duplicates.map(async (note) => {
+                        try {
+                            const fileName = `${note.id}.json`;
+                            const filesResponse = await driveApi.listFiles(folderIds.notes);
+                            const file = filesResponse.files.find(f => f.name === fileName);
+                            if (file) {
+                                await driveApi.deleteFile(file.id);
+                                console.log(`Deleted duplicate note ${note.id} from Google Drive`);
+                            }
+                        } catch (err) {
+                            console.error(`Failed to delete duplicate note ${note.id} from Drive:`, err);
                         }
-                    } catch (err) {
-                        console.error(`Failed to delete duplicate note ${note.id} from Drive:`, err);
-                    }
-                })
-            );
+                    })
+                );
+            } catch (err) {
+                console.error('Error during duplicate cleanup:', err);
+            }
 
             // Update state and IndexedDB with unique notes
             setNotes(uniqueNotes);
@@ -65,30 +71,65 @@ export function NotesProvider({ children, session }) {
         }
 
         return uniqueNotes;
-    }, [driveApi, folderIds]);
+    }, [driveApi, folderIds, isOnline]);
+
+    // Force load from IndexedDB
+    const loadFromIndexedDB = useCallback(async () => {
+        try {
+            console.log('NotesContext: Loading from IndexedDB');
+            const cachedNotes = await getFromDB(NOTES_STORE, 'notes_data') || [];
+            const cachedTags = await getFromDB(TAGS_STORE, 'tags_data') || [];
+            
+            // Don't deduplicate in offline mode to avoid API calls
+            if (isOnline) {
+                const cleanedNotes = await deduplicateNotes(cachedNotes);
+                setNotes(cleanedNotes);
+            } else {
+                setNotes(cachedNotes);
+            }
+            
+            setTags(cachedTags);
+            return { notes: cachedNotes, tags: cachedTags };
+        } catch (err) {
+            console.error('Failed to load data from IndexedDB:', err);
+            setError(err);
+            return { notes: [], tags: [] };
+        }
+    }, [deduplicateNotes, isOnline]);
 
     // Initial data load with deduplication
     useEffect(() => {
         const loadData = async () => {
-            if (!session || !driveApi || !folderIds) {
+            if (!session) {
                 setIsLoading(false);
                 return;
             }
+
             try {
                 setLoadingState({ progress: 50, message: 'Fetching notes...' });
-                const { notes: fetchedNotes, tags: fetchedTags } = await pullChangesFromDrive(driveApi, folderIds);
-
-                if (fetchedNotes) {
-                    const cleanedNotes = await deduplicateNotes(fetchedNotes);
-                    setNotes(cleanedNotes);
-                } else {
-                    const cachedNotes = (await getFromDB(NOTES_STORE, 'notes_data')) || [];
-                    const cleanedNotes = await deduplicateNotes(cachedNotes);
-                    setNotes(cleanedNotes);
+                
+                // Always load from IndexedDB first, especially important when offline
+                const { notes: cachedNotes, tags: cachedTags } = await loadFromIndexedDB();
+                
+                // If we're offline, just use the IndexedDB data
+                if (!isOnline) {
+                    setLoadingState({ progress: 100, message: 'Using offline data' });
+                    setIsLoading(false);
+                    setIsInitialSync(false);
+                    return;
                 }
+                
+                // If online and drive API is ready, try to pull from drive
+                if (driveApi && folderIds) {
+                    const { notes: fetchedNotes, tags: fetchedTags } = await pullChangesFromDrive(driveApi, folderIds);
 
-                if (fetchedTags) setTags(fetchedTags);
-                else setTags((await getFromDB(TAGS_STORE, 'tags_data')) || []);
+                    if (fetchedNotes) {
+                        const cleanedNotes = await deduplicateNotes(fetchedNotes);
+                        setNotes(cleanedNotes);
+                    } 
+
+                    if (fetchedTags) setTags(fetchedTags);
+                }
 
                 setLoadingState({ progress: 100, message: 'Data loaded' });
             } catch (err) {
@@ -100,13 +141,33 @@ export function NotesProvider({ children, session }) {
             }
         };
         loadData();
-    }, [session, driveApi, folderIds, deduplicateNotes]);
+    }, [session, driveApi, folderIds, deduplicateNotes, loadFromIndexedDB, isOnline]);
 
     const createNote = useCallback(async (noteData) => {
+        if (!isOnline && (!folderIds?.notes)) {
+            // In offline mode, just save to IndexedDB
+            const newNote = {
+                id: crypto.randomUUID(),
+                ...noteData,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+            };
+            
+            // Update local state
+            setNotes(prev => [...prev, newNote]);
+            
+            // Save to IndexedDB
+            await setInDB(NOTES_STORE, 'notes_data', [...notes, newNote]);
+            return newNote;
+        }
+        
+        // Online mode with Google Drive
         if (!folderIds?.notes) throw new Error('Notes folder not initialized');
         const newNote = {
             id: crypto.randomUUID(),
             ...noteData,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
         };
         const noteContent = JSON.stringify(newNote, null, 2);
         const noteBlob = new Blob([noteContent], { type: 'application/json' });
@@ -121,7 +182,7 @@ export function NotesProvider({ children, session }) {
         });
         await setInDB(NOTES_STORE, 'notes_data', [...notes, newNote]);
         return newNote;
-    }, [driveApi, folderIds, notes, deduplicateNotes]);
+    }, [driveApi, folderIds, notes, deduplicateNotes, isOnline]);
 
     const deleteNote = useCallback(async (noteId) => {
         if (!folderIds?.notes) throw new Error('Notes folder not initialized');
@@ -234,12 +295,8 @@ export function NotesProvider({ children, session }) {
     }, [driveApi, folderIds, deduplicateNotes]);
 
     const refreshFromIndexedDB = useCallback(async () => {
-        const cachedNotes = (await getFromDB(NOTES_STORE, 'notes_data')) || [];
-        const cleanedNotes = await deduplicateNotes(cachedNotes);
-        setNotes(cleanedNotes);
-        const cachedTags = (await getFromDB(TAGS_STORE, 'tags_data')) || [];
-        setTags(cachedTags);
-    }, [deduplicateNotes]);
+        await loadFromIndexedDB();
+    }, [loadFromIndexedDB]);
 
     return (
         <NotesContext.Provider value={{

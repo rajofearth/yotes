@@ -1,49 +1,71 @@
 import { useState, useEffect } from 'react';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
-import { Plus, Search, FileText, LogOut, Upload, Settings } from 'lucide-react';
-import { 
-    DropdownMenu, 
-    DropdownMenuContent, 
-    DropdownMenuItem, 
+import { Plus, Search, FileText, LogOut, Upload, Settings, User as UserIcon } from 'lucide-react'; // Added UserIcon
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
     DropdownMenuTrigger,
     DropdownMenuSeparator
 } from "../ui/dropdown-menu";
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../utils/supabaseClient';
-import { getFromDB, openDB } from '../../utils/indexedDB';
+import { getFromDB, setInDB, openDB } from '../../utils/indexedDB';
+import { useOnlineStatus } from '../../contexts/OnlineStatusContext';
 import { useSettings } from '../../hooks/useSettings';
 
 export default function NavBar({ onSearch }) {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
-  const { dialogs, setDialogs, handleLogout } = useSettings();
+  const isOnline = useOnlineStatus();
+  const { handleLogout } = useSettings();
 
   useEffect(() => {
+    let isMounted = true;
     const fetchUser = async () => {
+      if (!isMounted) return;
       try {
         setIsLoading(true);
-        // Ensure DB is initialized before accessing it
-        await openDB(); // This ensures the DB is at version 2
-        const cachedSession = await getFromDB('sessions', 'session');
+        await openDB();
+        let sessionUser = null;
+        let cachedSession = null;
+
+        cachedSession = await getFromDB('sessions', 'session');
         if (cachedSession?.user) {
-          setUser(cachedSession.user);
-        } else {
+          sessionUser = cachedSession.user;
+          if (isMounted) setUser(sessionUser);
+        }
+
+        if (isOnline) {
           const { data, error } = await supabase.auth.getUser();
-          if (error) throw error;
-          setUser(data.user);
+          if (error) {
+             console.error('NavBar: Supabase getUser error:', error);
+             if (!sessionUser && isMounted) setUser(null);
+          } else if (data.user) {
+             if (isMounted) setUser(data.user);
+             if (cachedSession && JSON.stringify(data.user) !== JSON.stringify(sessionUser)) {
+                await setInDB('sessions', 'session', { ...cachedSession, user: data.user });
+             }
+          } else {
+              if (isMounted) setUser(null);
+          }
+        } else if (!sessionUser && isMounted) {
+           setUser(null);
         }
       } catch (error) {
-        console.error('Failed to load user data:', error);
+        console.error('NavBar: Failed to load user data:', error);
+        if (isMounted) setUser(null);
       } finally {
-        setIsLoading(false);
+        if (isMounted) setIsLoading(false);
       }
     };
     fetchUser();
-  }, []);
+    return () => { isMounted = false };
+  }, [isOnline]);
 
-  const profilePicture = user?.user_metadata?.avatar_url || 'https://placehold.co/40';
+  const profilePicture = user?.user_metadata?.avatar_url; // No default here
 
   return (
     <nav className="sticky top-0 z-50 border-b border-overlay/10 bg-bg-primary/95 backdrop-blur">
@@ -111,20 +133,15 @@ export default function NavBar({ onSearch }) {
             </DropdownMenu>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-10 w-10 rounded-full bg-overlay/5 hover:bg-overlay/10 overflow-hidden transition-all hover:ring-2 hover:ring-overlay/20 relative"
-                >
+                <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full bg-overlay/5 hover:bg-overlay/10 overflow-hidden transition-all hover:ring-2 hover:ring-overlay/20 relative" disabled={isLoading}>
                   {isLoading ? (
                     <div className="h-[80%] w-[80%] rounded-full bg-overlay/10 animate-pulse" />
                   ) : (
-                    <img
-                      src={profilePicture}
-                      alt="User profile"
-                      className="h-[80%] w-[80%] rounded-full object-cover transition-opacity hover:opacity-90"
-                      onError={(e) => (e.target.src = 'https://placehold.co/40')}
-                    />
+                     profilePicture ? (
+                        <img src={profilePicture} alt="User profile" className="h-[80%] w-[80%] rounded-full object-cover transition-opacity hover:opacity-90" onError={(e) => (e.target.src = 'https://placehold.co/40')} />
+                     ) : (
+                         <div className="h-[80%] w-[80%] rounded-full bg-overlay/10 flex items-center justify-center text-icon-primary"><UserIcon className="h-5 w-5"/></div> // Generic user icon
+                     )
                   )}
                   <span className="sr-only">Avatar</span>
                 </Button>

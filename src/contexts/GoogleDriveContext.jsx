@@ -4,6 +4,7 @@ import { useToast } from './ToastContext';
 import { GoogleDriveAPI } from '../utils/googleDrive';
 import { DriveStructureManager } from '../utils/driveStructure';
 import { openDB, getFromDB, setInDB, clearDB } from '../utils/indexedDB';
+import { useOnlineStatus } from './OnlineStatusContext';
 
 const GoogleDriveContext = createContext(null);
 const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
@@ -32,6 +33,7 @@ export function GoogleDriveProvider({ session, children }) {
   const showToast = useToast();
   const hasInitializedRef = useRef(false);
   const refreshTokenPromiseRef = useRef(null);
+  const isOnline = useOnlineStatus();
 
   const driveApi = useMemo(() => {
     return accessToken ? new GoogleDriveAPI(accessToken) : null;
@@ -179,6 +181,25 @@ export function GoogleDriveProvider({ session, children }) {
         let tokenToUse = null;
 
         try {
+            // Check if we're offline
+            if (!isOnline) {
+                console.log('Offline mode detected during Google Drive initialization');
+                // Try to get cached folder IDs
+                const cachedFolderIds = await getFromDB('sessions', 'folder_ids');
+                if (cachedFolderIds) {
+                    // Use cached folder structure
+                    if (isMounted) {
+                        setFolderIds(cachedFolderIds);
+                        hasInitializedRef.current = true;
+                    }
+                } else {
+                    if (isMounted) {
+                        setError(new Error('Offline with no cached data. Connect to the internet to initialize.'));
+                    }
+                }
+                return;
+            }
+
             const currentRefreshToken = session.provider_refresh_token;
             // Always store the latest refresh token from the session prop
             if (currentRefreshToken) {
@@ -229,11 +250,29 @@ export function GoogleDriveProvider({ session, children }) {
             if (tokenToUse && isMounted) {
                 const setupDriveApi = new GoogleDriveAPI(tokenToUse);
                 const structureManager = new DriveStructureManager(setupDriveApi);
-                const folders = await structureManager.initializeStructure();
-
-                if (isMounted) {
-                    setFolderIds(folders);
-                    hasInitializedRef.current = true;
+                try {
+                    const folders = await structureManager.initializeStructure();
+                    if (isMounted) {
+                        setFolderIds(folders);
+                        // Cache folder IDs for offline use
+                        await setInDB('sessions', 'folder_ids', folders);
+                        hasInitializedRef.current = true;
+                    }
+                } catch (folderError) {
+                    console.error('Error initializing drive structure:', folderError);
+                    // If offline, try to use cached folders
+                    if (!navigator.onLine) {
+                        const cachedFolderIds = await getFromDB('sessions', 'folder_ids');
+                        if (cachedFolderIds && isMounted) {
+                            console.log('Using cached folder IDs after structure init failure');
+                            setFolderIds(cachedFolderIds);
+                            hasInitializedRef.current = true;
+                        } else {
+                            throw new Error('Cannot initialize while offline with no cached data');
+                        }
+                    } else {
+                        throw folderError;
+                    }
                 }
             } else if (isMounted && !error) {
                  setError(new Error('Failed to obtain access token.'));
@@ -244,7 +283,8 @@ export function GoogleDriveProvider({ session, children }) {
              if (isMounted && !error) setError(err);
              // Ensure state is reset on failure
              setAccessToken(null);
-             setFolderIds(null);
+             // Don't reset folderIds if offline - we might be using cached values
+             if (isOnline) setFolderIds(null);
         } finally {
              if (isMounted) setIsLoading(false);
         }
@@ -268,7 +308,26 @@ export function GoogleDriveProvider({ session, children }) {
         isMounted = false;
         clearTimeout(refreshTimer);
     };
-  }, [session, refreshToken, scheduleTokenRefresh, error]); // Added error to dep array
+  }, [session, refreshToken, scheduleTokenRefresh, error, isOnline]); // Added isOnline to dep array
+
+  useEffect(() => {
+    // Check if we're offline and still in loading state
+    if (!isOnline && isLoading) {
+      console.log('GoogleDriveProvider: Detected offline status during loading, finishing initialization');
+      setIsLoading(false);
+      if (!folderIds) {
+        // Try to get cached folder IDs
+        getFromDB('sessions', 'folder_ids')
+          .then(cachedIds => {
+            if (cachedIds) {
+              setFolderIds(cachedIds);
+              hasInitializedRef.current = true;
+            }
+          })
+          .catch(err => console.error('Error getting cached folder IDs:', err));
+      }
+    }
+  }, [isOnline, isLoading, folderIds]);
 
   const value = useMemo(() => ({
     isLoading,
