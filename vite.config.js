@@ -64,11 +64,7 @@ export default defineConfig({
             name: "Settings",
             url: "/settings",
             description: "Open Yotes settings",
-<<<<<<< Updated upstream
-            icons: [{ src: 'favicon-96x96.png', sizes: '96x96' }] 
-=======
             icons: [{ src: 'favicon-96x96.png', sizes: '96x96' }]
->>>>>>> Stashed changes
           } 
         ],
 
