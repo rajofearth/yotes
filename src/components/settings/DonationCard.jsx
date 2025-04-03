@@ -14,7 +14,7 @@ export const DonationCard = ({ setDialogs }) => {
       </CardHeader>
       <CardContent className="space-y-6">
         <p className="text-sm text-text-primary/80">
-          Your Notes is free and open-source software. Your donations help fund ongoing development and improvements.
+          Yotes is free and open-source software. Your donations help fund ongoing development and improvements.
         </p>
         
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

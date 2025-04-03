@@ -1,10 +1,23 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { TextShimmer } from './ui/text-shimmer';
 import PropTypes from 'prop-types';
 
 const ProgressBar = ({ progress, message }) => {
   // Determine if progress is indeterminate (e.g., undefined, null, or < 0)
   const isIndeterminate = typeof progress !== 'number' || progress < 0;
+  const [shouldHide, setShouldHide] = useState(false);
+  
+  // Handle complete progress
+  useEffect(() => {
+    if (progress === 100) {
+      // Add small delay before hiding to allow for smooth transition
+      const timer = setTimeout(() => setShouldHide(true), 800);
+      return () => clearTimeout(timer);
+    }
+  }, [progress]);
+  
+  // Don't render if should hide
+  if (shouldHide) return null;
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-bg-primary"> {/* Ensure background */}

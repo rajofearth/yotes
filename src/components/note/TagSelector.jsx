@@ -22,7 +22,6 @@ export const TagSelector = ({ note, tags, onTagToggle, onCreateTag, onTagManagem
         newColor: 'bg-purple-600/20 text-purple-600',
     });
 
-
     const removeTag = (tagId) => {
         onTagToggle(tagId); // Reuse onTagToggle for removal
     };
@@ -43,7 +42,7 @@ export const TagSelector = ({ note, tags, onTagToggle, onCreateTag, onTagManagem
                                     onClick={() => setIsTagSelectionOpen(true)}
                                     className="h-6 w-6 p-0"
                                 >
-                                    <Plus className="h-3.5 w-3.5" />
+                                    <Plus className="h-4 w-4" />
                                 </Button>
                             </TooltipTrigger>
                             <TooltipContent>
@@ -105,7 +104,7 @@ export const TagSelector = ({ note, tags, onTagToggle, onCreateTag, onTagManagem
                                     <input
                                         type="checkbox"
                                         checked={note.tags.includes(tag.id)}
-                                        onChange={() => onTagToggle(tag.id)} // Now defined!
+                                        onChange={() => onTagToggle(tag.id)} 
                                         className="h-4 w-4 text-primary focus:ring-primary/40"
                                     />
                                     <span className={`${tag.color?.split(' ').find(c => c.startsWith('text-')) || 'text-gray-500'} text-sm`}>
@@ -128,6 +127,5 @@ export const TagSelector = ({ note, tags, onTagToggle, onCreateTag, onTagManagem
                 handleTagAction={onCreateTag}
             />
         </>
-
     )
 }

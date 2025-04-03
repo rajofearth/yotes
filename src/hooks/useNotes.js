@@ -325,6 +325,12 @@ export function useNotes() {
   // loadDataFromDrive (Initial Load/Refresh Logic)
   const loadDataFromDrive = useCallback(
     async (force = false) => {
+      // Add check to prevent reload when window regains focus unnecessarily
+      if (!force && !isInitialSync && initialLocalLoadPerformedRef.current) {
+        // Skip refetching if it's not a forced refresh and initial sync is done
+        return;
+      }
+      
       if (!isOnline) {
         if (isInitialSync) setIsInitialSync(false);
         setIsLoading(false); // Stop loading indicator if offline

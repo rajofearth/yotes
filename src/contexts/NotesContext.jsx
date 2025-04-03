@@ -138,6 +138,11 @@ export function NotesProvider({ children, session }) {
             } finally {
                 setIsLoading(false);
                 setIsInitialSync(false);
+                
+                // Force reset loading state after a timeout
+                setTimeout(() => {
+                    setLoadingState({ progress: 100, message: '' });
+                }, 1000);
             }
         };
         loadData();

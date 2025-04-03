@@ -18,7 +18,7 @@ import Login from './pages/auth/login'; // Ensure correct path
 import AuthCallback from './pages/auth/callback';
 import Settings from './pages/settings';
 const SectionView = lazy(() => import('./pages/section/[id]'));
-const NoteEditor = lazy(() => import('./pages/note/NoteEditor'));
+import NoteEditor from './pages/note/NoteEditor';
 import ErrorBoundary from './components/ErrorBoundary';
 import ProgressBar from './components/ProgressBar';
 import PWAReloadPrompt from './components/PWAReloadPrompt';
@@ -81,7 +81,15 @@ function AppContent({ session, isAuthLoading, isInitialLoad, setIsInitialLoad })
         setIsInitialLoad(false);
         initialLoadCompletedRef.current = true;
      }
-  }, [stillLoading, setIsInitialLoad]);
+     
+     // Force exit loading state if data is loaded but screen is still showing
+     if (loadingState?.progress === 100 && loadingState?.message === 'Data loaded') {
+        setTimeout(() => {
+          setIsInitialLoad(false);
+          initialLoadCompletedRef.current = true;
+        }, 500); // Short delay to ensure transition is smooth
+     }
+  }, [stillLoading, setIsInitialLoad, loadingState]);
 
 
   // --- Render Logic ---
@@ -231,6 +239,10 @@ function App() {
 
       if (event === 'SIGNED_IN' && !wasAuth) setIsInitialLoad(true); // Start load sequence
       else if (event === 'SIGNED_OUT') setIsInitialLoad(false); // Stop load sequence
+      else if (event === 'TOKEN_REFRESH_FAILED') {
+        console.warn('Supabase token refresh failed, you might need to re-login');
+        // Optionally handle this case (could redirect to login)
+      }
       else if ((event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') && isAuth && !wasAuth && !isInitialLoad) {
           // Handles cases where auth is confirmed after initial getSession check maybe failed
           setIsInitialLoad(true);

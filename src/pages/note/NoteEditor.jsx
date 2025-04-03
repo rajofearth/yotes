@@ -28,6 +28,21 @@ export default function NoteEditor() {
   const contentRef = useRef(null);
   const isCreate = !noteId;
 
+  // Load draft from localStorage when creating a new note
+  useEffect(() => {
+    if (isCreate) {
+      const draftNote = localStorage.getItem('note_draft');
+      if (draftNote) {
+        try {
+          const parsedDraft = JSON.parse(draftNote);
+          setNote(parsedDraft);
+        } catch (error) {
+          console.error('Failed to parse draft note:', error);
+        }
+      }
+    }
+  }, [isCreate]);
+
   useEffect(() => {
     if (noteId && !isNotesLoading) { // Wait for notes to load
       const existingNote = notes.find(n => n.id === noteId);
@@ -41,14 +56,16 @@ export default function NoteEditor() {
         return;
       }
     } else if (isCreate) {
-      setNote({
-        title: '',
-        description: '',
-        content: '',
-        tags: [],
-      });
+      // Use state as is - we've already loaded from draft if available
     }
   }, [noteId, notes, isNotesLoading, navigate, showToast, isCreate]);
+
+  // Save draft to localStorage when note changes
+  useEffect(() => {
+    if (isCreate) {
+      localStorage.setItem('note_draft', JSON.stringify(note));
+    }
+  }, [note, isCreate]);
 
   // Focus title input on initial mount
   useEffect(() => {
@@ -67,6 +84,13 @@ export default function NoteEditor() {
         originalNote?.content !== note.content ||
         JSON.stringify(originalNote?.tags) !== JSON.stringify(note.tags);
       setHasChanges(changesDetected);
+    } else if (isCreate) {
+      // For new notes, check if there's any content to save
+      const hasContent = 
+        note.title.trim() !== '' || 
+        note.description.trim() !== '' || 
+        note.content.trim() !== '';
+      setHasChanges(hasContent);
     }
   }, [note, notes, isCreate, noteId]);
 
@@ -99,7 +123,12 @@ export default function NoteEditor() {
   }, [hasChanges]);
 
   const handleSave = async () => {
-    if (!hasChanges) return;
+    // Validate note has content before saving
+    if (!note.title.trim() && !note.description.trim() && !note.content.trim()) {
+      showToast('Cannot save an empty note. Please add some content.', 'error');
+      return;
+    }
+
     setIsSaving(true);
 
     try {
@@ -113,6 +142,8 @@ export default function NoteEditor() {
         setLastSaved(now);
         setHasChanges(false); // Reset after save
         showToast('Note created successfully', 'success');
+        // Clear draft after successful save
+        localStorage.removeItem('note_draft');
         navigate('/', { state: { resetFilters: true, refresh: true } });
       } else {
         await updateNote(noteId, { ...note, updatedAt: now.toISOString() });
