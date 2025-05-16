@@ -1,6 +1,5 @@
-// src/components/home/DesktopHome.jsx
 import React, { useMemo } from 'react';
-import { HorizontalNotesSection } from './notesSection'; // Updated import
+import { HorizontalNotesSection } from './notesSection'; 
 import { TagFilters } from './TagFilters';
 import NavBar from './navBar';
 import { groupNotesByDate } from './grpNotesByDate';

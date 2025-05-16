@@ -129,90 +129,23 @@ const shouldRefreshCache = async (storeName) => {
     catch (err) { console.warn(`Cache check error for ${storeName}:`, err); return true; }
 };
 
-const mergeData = (local, remote, timestampField) => {
+export const mergeData = (localData = [], remoteData = [], idKey = 'id') => {
+    // Create a map for quick lookup
     const dataMap = new Map();
-    (local || []).forEach(item => dataMap.set(item.id, item));
-    (remote || []).forEach((remoteItem) => {
-        const localItem = dataMap.get(remoteItem.id);
-        if (!localItem) { dataMap.set(remoteItem.id, remoteItem); }
-        else if (timestampField) {
-            const remoteTs = new Date(remoteItem[timestampField]).getTime(); const localTs = new Date(localItem[timestampField]).getTime();
-            if (!isNaN(remoteTs) && (isNaN(localTs) || remoteTs > localTs)) { dataMap.set(remoteItem.id, remoteItem); }
+    
+    // Add all local data to map
+    localData.forEach(item => dataMap.set(item[idKey], item));
+    
+    // Check remote data - keep newer versions
+    remoteData.forEach(remoteItem => {
+        const localItem = dataMap.get(remoteItem[idKey]);
+        
+        // If no local item or remote item is newer, use remote
+        if (!localItem || new Date(remoteItem.updatedAt) > new Date(localItem.updatedAt)) {
+            dataMap.set(remoteItem[idKey], remoteItem);
         }
     });
+    
+    // Convert map back to array
     return Array.from(dataMap.values());
-};
-
-export const pullChangesFromDrive = async (driveApi, folderIds, force = false) => {
-    // First check if we're online
-    const isOnline = navigator.onLine;
-    if (!isOnline) {
-        console.log('Offline: Using cached data from IndexedDB');
-        const cachedNotes = await getFromDB(NOTES_STORE, 'notes_data') || [];
-        const cachedTags = await getFromDB(TAGS_STORE, 'tags_data') || [];
-        return { notes: cachedNotes, tags: cachedTags, cacheUsed: true, offline: true };
-    }
-    
-    if (!driveApi || !folderIds) return { notes: null, tags: null, cacheUsed: false, offline: false };
-    
-    try {
-        const notesCacheFresh = !force && !(await shouldRefreshCache(NOTES_STORE));
-        const tagsCacheFresh = !force && !(await shouldRefreshCache(TAGS_STORE));
-        let mergedNotes = (await getFromDB(NOTES_STORE, 'notes_data')) || [];
-        let mergedTags = (await getFromDB(TAGS_STORE, 'tags_data')) || [];
-
-        if (notesCacheFresh && tagsCacheFresh) return { notes: mergedNotes, tags: mergedTags, cacheUsed: true, offline: false };
-
-        if (force || !tagsCacheFresh) {
-            let remoteTags = [];
-            try {
-                const res = await driveApi.listFiles(folderIds.tags); const file = res.files.find(f => f.name === 'tags.json');
-                if (file) { const [blob] = await driveApi.downloadFiles([file.id]); if(blob) remoteTags = JSON.parse(await blob.text()); }
-            } catch (e) { 
-                console.error("Err fetch tags:", e);
-                // If error is due to being offline, return cached data
-                if (!navigator.onLine) {
-                    return { notes: mergedNotes, tags: mergedTags, cacheUsed: true, offline: true };
-                }
-            }
-            mergedTags = mergeData(mergedTags, remoteTags, 'id');
-            await setInDB(TAGS_STORE, 'tags_data', mergedTags); await setInDB(TAGS_STORE, 'tags_timestamp', Date.now());
-        }
-
-        if (force || !notesCacheFresh) {
-            let remoteNotes = [];
-            try {
-                const res = await driveApi.listFiles(folderIds.notes);
-                if (res?.files?.length) {
-                    const fileIds = res.files.filter(f => f.name.endsWith('.json')).map(f => f.id);
-                    if (fileIds.length) {
-                        const blobs = await driveApi.downloadFiles(fileIds);
-                        const notesData = await Promise.all(blobs.map(async (blob) => {
-                            try { return JSON.parse(await blob.text()); } catch (e) { console.error("Error parsing JSON:", e); return null; }
-                        }));
-                        remoteNotes = notesData.filter(n => n !== null);
-                    }
-                }
-            } catch (e) { 
-                console.error("Err fetch notes:", e);
-                // If error is due to being offline, return cached data
-                if (!navigator.onLine) {
-                    return { notes: mergedNotes, tags: mergedTags, cacheUsed: true, offline: true };
-                }
-            }
-            mergedNotes = mergeData(mergedNotes, remoteNotes, 'id');
-            await setInDB(NOTES_STORE, 'notes_data', mergedNotes); await setInDB(NOTES_STORE, 'notes_timestamp', Date.now());
-        }
-
-        return { notes: mergedNotes, tags: mergedTags, cacheUsed: false, offline: false };
-    } catch (err) {
-        console.error("Error in pullChangesFromDrive:", err);
-        // If offline during this process, return cached data
-        if (!navigator.onLine) {
-            const cachedNotes = await getFromDB(NOTES_STORE, 'notes_data') || [];
-            const cachedTags = await getFromDB(TAGS_STORE, 'tags_data') || [];
-            return { notes: cachedNotes, tags: cachedTags, cacheUsed: true, offline: true };
-        }
-        throw err;
-    }
 };

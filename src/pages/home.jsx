@@ -1,15 +1,14 @@
-// src/pages/home.jsx
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useMediaQuery } from 'react-responsive';
 import DesktopHome from '../components/home/DesktopHome';
 import MobileHome from '../components/home/MobileHome';
-import { useNotes } from '../contexts/NotesContext';
+import { useNotes } from '../hooks/useNotes';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { applyFiltersAndSearch, debounce } from '../utils/noteFilters';
 import { useOnlineStatus } from '../contexts/OnlineStatusContext';
 
 export default function Home() {
-  const isDesktop = useMediaQuery({ minWidth: 768 }); // 'lg' breakpoint
+  const isDesktop = useMediaQuery({ minWidth: 768 }); 
   const { notes, tags, error, refreshData, refreshFromIndexedDB } = useNotes();
   const location = useLocation();
   const navigate = useNavigate();
@@ -37,7 +36,7 @@ export default function Home() {
       if (isOnline) {
         refreshData();
       } else {
-        refreshFromIndexedDB(); // Use IndexedDB refresh when offline
+        refreshFromIndexedDB(); 
       }
       navigate('/', { replace: true, state: {} });
     }
@@ -51,7 +50,7 @@ export default function Home() {
     notes,
     tags,
     error,
-    refreshData: isOnline ? refreshData : refreshFromIndexedDB, // Use appropriate refresh method
+    refreshData: isOnline ? refreshData : refreshFromIndexedDB, 
     onSearch: handleSearch,
     onFilterChange: handleFilterChange,
     filteredNotes,

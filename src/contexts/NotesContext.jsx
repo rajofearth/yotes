@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useGoogleDrive } from './GoogleDriveContext';
-import { setInDB, getFromDB, pullChangesFromDrive, NOTES_STORE, TAGS_STORE } from '../utils/indexedDB';
+import { setInDB, getFromDB, NOTES_STORE, TAGS_STORE } from '../utils/indexedDB';
+import { pullChangesFromDrive } from '../utils/sync/pullChanges';
 import { DRIVE_FOLDER_NAMES } from '../utils/driveStructure';
 import { useOnlineStatus } from './OnlineStatusContext';
 

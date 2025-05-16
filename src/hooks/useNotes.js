@@ -2,17 +2,10 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useGoogleDrive } from '../contexts/GoogleDriveContext';
 import { useToast } from '../contexts/ToastContext';
 import { useOnlineStatus } from '../contexts/OnlineStatusContext';
-import {
-  openDB,
-  getFromDB,
-  setInDB,
-  addToSyncQueue,
-  getSyncQueue,
-  clearSyncItem,
-  pullChangesFromDrive,
-  NOTES_STORE,
-  TAGS_STORE,
-} from '../utils/indexedDB';
+import { openDB, getFromDB, setInDB, getSyncQueue, addToSyncQueue, clearSyncItem, NOTES_STORE, TAGS_STORE } from '../utils/indexedDB';
+import { pullChangesFromDrive } from '../utils/sync/pullChanges';
+import { checkDiscrepancies } from '../utils/sync/checkDiscrepancies';
+import debounce from 'lodash/debounce';
 
 // Simple event emitter
 class EventEmitter {
@@ -60,6 +53,20 @@ export function useNotes() {
   const [isManualSyncing, setIsManualSyncing] = useState(false);
   const [syncProgressMessage, setSyncProgressMessage] = useState('');
   const [hasPendingChanges, setHasPendingChanges] = useState(false);
+  const [syncDiscrepancyDetected, setSyncDiscrepancyDetected] = useState(false);
+  // Ref to guard against overlapping discrepancy checks
+  const discrepancyInFlightRef = useRef(false);
+
+  // Global sync error reporting
+  const [syncError, setSyncError] = useState(null);
+
+  // Show a single toast when any sync error occurs
+  useEffect(() => {
+    if (syncError) {
+      showToast(syncError.message || 'Error during synchronization', 'error');
+      setSyncError(null);
+    }
+  }, [syncError, showToast]);
 
   // Function to check sync queue and update state
   const checkPendingChanges = useCallback(async () => {
@@ -71,6 +78,46 @@ export function useNotes() {
       setHasPendingChanges(false); // Assume no changes if check fails
     }
   }, []);
+
+  // Function to check for discrepancies between local state and Drive, with optional deep check and concurrency guard
+  const checkSyncDiscrepancies = useCallback(async (deep = false) => {
+    if (discrepancyInFlightRef.current) {
+      return false;
+    }
+    if (!isOnline || !driveApi || !folderIds) {
+      setSyncDiscrepancyDetected(false);
+      return false;
+    }
+    discrepancyInFlightRef.current = true;
+    try {
+      const syncNeeded = await checkDiscrepancies(driveApi, folderIds, notes, tags, deep);
+      setSyncDiscrepancyDetected(syncNeeded);
+      return syncNeeded;
+    } catch (err) {
+      console.error('Error checking sync discrepancies:', err);
+      setSyncError(err);
+      return false;
+    } finally {
+      discrepancyInFlightRef.current = false;
+    }
+  }, [isOnline, driveApi, folderIds, notes, tags]);
+
+  // Debounced wrapper for shallow discrepancy checks
+  const debouncedShallowCheck = useMemo(
+    () => debounce(() => checkSyncDiscrepancies(false), 500),
+    [checkSyncDiscrepancies]
+  );
+
+  // Check for pending changes on mount and when online status changes
+  useEffect(() => {
+    checkPendingChanges();
+    if (isOnline && driveApi && folderIds) {
+      debouncedShallowCheck();
+    }
+    return () => {
+      debouncedShallowCheck.cancel();
+    };
+  }, [checkPendingChanges, isOnline, driveApi, folderIds, debouncedShallowCheck]);
 
   // Initial Cache Load
   const loadInitialDataFromCache = useCallback(async () => {
@@ -128,13 +175,34 @@ export function useNotes() {
     let syncErrorOccurred = false;
     let finalMessage = 'Sync complete.';
     let queueChanged = false; // Track if local state potentially updated
+    let remoteOnlySync = false; // Flag for operations that only pulled remote changes
 
     try {
       queue = await getSyncQueue();
+      
+      // Even if there are no local changes, we still need to check for remote-local discrepancies
       if (queue.length === 0) {
-        finalMessage = 'Nothing to sync.';
-        setHasPendingChanges(false);
-        return; // Exit early
+        // Check if there are discrepancies between remote and local
+        setSyncProgressMessage('Checking for discrepancies...');
+        const syncNeeded = await checkDiscrepancies(driveApi, folderIds, notes, tags);
+        
+        if (!syncNeeded) {
+          setSyncDiscrepancyDetected(false);
+          finalMessage = 'No changes to sync.';
+          return; // Exit early if no discrepancies
+        }
+        
+        // If there are discrepancies but no local queue items, we need to pull from drive
+        setSyncProgressMessage('Syncing with remote changes...');
+        const { notes: pulledNotes, tags: pulledTags } = await pullChangesFromDrive(driveApi, folderIds, true);
+        
+        if (pulledNotes) setNotes(pulledNotes);
+        if (pulledTags) setTags(pulledTags);
+        
+        setSyncDiscrepancyDetected(false);
+        finalMessage = 'Remote changes integrated successfully.';
+        remoteOnlySync = true;
+        return;
       }
 
       setSyncProgressMessage(
@@ -281,25 +349,8 @@ export function useNotes() {
       setSyncProgressMessage('Local changes saved to Google Drive.');
       await new Promise((r) => setTimeout(r, 500));
 
-      // --- Optional: Pull after successful push ---
-      setSyncProgressMessage('Checking for remote changes...');
-      await new Promise((r) => setTimeout(r, 300));
-      try {
-        const { notes: pulledNotes, tags: pulledTags } =
-          await pullChangesFromDrive(driveApi, folderIds, true); // Force pull
-        if (pulledNotes) setNotes(pulledNotes); // Update state with potentially merged data
-        if (pulledTags) setTags(pulledTags);
-        setSyncProgressMessage('Remote changes integrated.');
-        await new Promise((r) => setTimeout(r, 500));
-      } catch (pullError) {
-        console.error('Error pulling changes after sync:', pullError);
-        setSyncProgressMessage(
-          'Sync complete, but failed to check for remote changes.'
-        );
-        showToast("Couldn't check for remote changes after sync.", 'warning');
-        await new Promise((r) => setTimeout(r, 1000));
-      }
-      finalMessage = 'Sync successful!'; // Update final message on success
+      // After pushing local changes, mark sync as successful
+      finalMessage = 'Sync successful!';
     } catch (err) {
       // Catches errors re-thrown from the inner loop
       console.error('Error during manual sync process:', err);
@@ -310,16 +361,18 @@ export function useNotes() {
       }
       await checkPendingChanges(); // Re-check queue state after error
     } finally {
+      // Removed redundant discrepancy re-check to reduce latency
       await new Promise((r) => setTimeout(r, syncErrorOccurred ? 1500 : 500));
       setIsManualSyncing(false);
       setSyncProgressMessage('');
-      if (!syncErrorOccurred && queue.length > 0) { // Show final success only if sync ran
+      if (!syncErrorOccurred && (queue.length > 0 || remoteOnlySync)) { // Show success even for remote-only sync
         showToast(finalMessage, 'success');
       }
     }
   }, [
     isOnline, driveApi, folderIds, notes, tags,
     showToast, isManualSyncing, checkPendingChanges,
+    checkSyncDiscrepancies
   ]);
 
   // loadDataFromDrive (Initial Load/Refresh Logic)
@@ -626,5 +679,7 @@ export function useNotes() {
     isManualSyncing,
     syncProgressMessage,
     hasPendingChanges,
+    syncDiscrepancyDetected,
+    checkSyncDiscrepancies
   };
 }

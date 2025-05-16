@@ -37,6 +37,7 @@ function AppContent({ session, isAuthLoading, isInitialLoad, setIsInitialLoad })
     isManualSyncing,
     syncProgressMessage,
     hasPendingChanges,
+    syncDiscrepancyDetected,
   } = useNotes();
   const initialLoadCompletedRef = useRef(false);
   const firstOfflineToastShown = useRef(false);
@@ -194,6 +195,7 @@ function AppContent({ session, isAuthLoading, isInitialLoad, setIsInitialLoad })
         hasPending={hasPendingChanges}
         onSync={manualSyncWithDrive}
         isSyncing={isManualSyncing}
+        syncDiscrepancyDetected={syncDiscrepancyDetected}
       />
       <SyncButton />
     </ErrorBoundary>

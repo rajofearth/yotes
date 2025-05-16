@@ -1,6 +1,5 @@
-// src/components/home/MobileHome.jsx
 import React, { useMemo, useState, useEffect } from 'react';
-import { VerticalNotesSection } from './notesSection'; // Updated import
+import { VerticalNotesSection } from './notesSection';
 import { TagFilters } from './TagFilters';
 import NavBar from './navBar';
 import { groupNotesByDate } from './grpNotesByDate';
