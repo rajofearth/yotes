@@ -13,13 +13,13 @@ export const EditTagDialog = ({ open, onOpenChange, tagState, setTagState, handl
           <DialogTitle className="text-xl font-semibold text-text-primary">Edit Tag</DialogTitle>
           <DialogDescription className="text-text-primary/60">
             Update the name and color of your tag.
-            {tagUsageCount > 0 && (
-              <div className="flex items-center gap-1 mt-2 text-text-primary/70">
-                <FileText className="h-4 w-4" />
-                <span>Used in {tagUsageCount} {tagUsageCount === 1 ? 'note' : 'notes'}</span>
-              </div>
-            )}
           </DialogDescription>
+          {tagUsageCount > 0 && (
+            <div className="flex items-center gap-1 mt-2 text-text-primary/70">
+              <FileText className="h-4 w-4" />
+              <span>Used in {tagUsageCount} {tagUsageCount === 1 ? 'note' : 'notes'}</span>
+            </div>
+          )}
         </DialogHeader>
         <div className="py-4 space-y-4">
           <Input

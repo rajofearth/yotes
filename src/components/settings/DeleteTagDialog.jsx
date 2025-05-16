@@ -8,18 +8,16 @@ export const DeleteTagDialog = ({ open, onOpenChange, loading, handleTagAction, 
       <DialogHeader>
         <DialogTitle className="text-xl font-semibold text-text-primary">Confirm Tag Deletion</DialogTitle>
         <DialogDescription className="text-text-primary/60">
-          {tagUsageCount > 0 ? (
-            <>
-              <p>This tag is used in {tagUsageCount} {tagUsageCount === 1 ? 'note' : 'notes'}.</p>
-              <div className="flex items-center gap-1 mt-2 text-yellow-500">
-                <FileText className="h-4 w-4" />
-                <span>The tag will be removed from all notes.</span>
-              </div>
-            </>
-          ) : (
-            <p>This tag is not used in any notes and will be permanently deleted.</p>
-          )}
+          {tagUsageCount > 0
+            ? `This tag is used in ${tagUsageCount} ${tagUsageCount === 1 ? 'note' : 'notes'}.`
+            : 'This tag is not used in any notes and will be permanently deleted.'}
         </DialogDescription>
+        {tagUsageCount > 0 && (
+          <div className="flex items-center gap-1 mt-2 text-yellow-500">
+            <FileText className="h-4 w-4" />
+            <span>The tag will be removed from all notes.</span>
+          </div>
+        )}
       </DialogHeader>
       <DialogFooter className="flex flex-col sm:flex-row justify-end gap-4">
         <Button variant="outline" onClick={() => onOpenChange(false)} className="bg-overlay/5 hover:bg-overlay/10">
