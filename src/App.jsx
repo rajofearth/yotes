@@ -2,6 +2,7 @@ import React, { Suspense, lazy, useEffect, useState, useRef } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Analytics } from '@vercel/analytics/react';
 import { supabase } from './utils/supabaseClient';
+import { findSupabaseLocalStorageKey } from './hooks/useSettings';
 import {
   GoogleDriveProvider,
   useGoogleDrive,
@@ -208,6 +209,10 @@ function App() {
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [isInitialLoad, setIsInitialLoad] = useState(true); // Tracks the whole sequence
 
+  // Check for cached Supabase session in localStorage
+  const supabaseStorageKey = findSupabaseLocalStorageKey();
+  const hasLocalSession = supabaseStorageKey ? localStorage.getItem(supabaseStorageKey) : false;
+
   useEffect(() => {
     let mounted = true;
     // Check initial session
@@ -218,7 +223,7 @@ function App() {
           if (error) console.error('App: Error fetching initial session:', error);
           setSession(currentSession);
           // Only set isInitialLoad true if there *is* a session to load data for
-          setIsInitialLoad(!!currentSession);
+          setIsInitialLoad(!!currentSession || !!hasLocalSession);
           setIsAuthLoading(false);
         }
       })
@@ -257,7 +262,7 @@ function App() {
   }, []); // Empty dependency array is correct here
 
   // Early return for logged out + offline
-  if (!isAuthLoading && !session && !isOnline) {
+  if (!isAuthLoading && !session && !isOnline && !hasLocalSession) {
     return (
       <ToastProvider>
         <div className="min-h-screen bg-bg-primary flex flex-col items-center justify-center p-4 text-center">

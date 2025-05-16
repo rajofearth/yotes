@@ -28,12 +28,14 @@ export default defineConfig({
           },
         ],
         cleanupOutdatedCaches: true,
+        navigateFallback: '/index.html',
       },
 
       // --- Development Options ---
       devOptions: {
-         // *** DISABLE PWA IN DEV SERVER ***
-         enabled: false,
+        // Enable PWA during development for offline testing
+        enabled: true,
+        type: 'module'
       },
 
       // --- Web App Manifest ---

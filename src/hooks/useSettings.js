@@ -6,7 +6,7 @@ import { useToast } from '../contexts/ToastContext';
 import { getFromDB, setInDB, clearDB } from '../utils/indexedDB';
 import { useOnlineStatus } from '../contexts/OnlineStatusContext';
 
-const findSupabaseLocalStorageKey = () => {
+export const findSupabaseLocalStorageKey = () => {
     if (typeof window === 'undefined' || !window.localStorage) return null;
     for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
