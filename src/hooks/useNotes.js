@@ -661,8 +661,8 @@ export function useNotes() {
   return {
     notes,
     tags,
-    isLoading: isOnline ? (isLoading || isInitialSync) : false, // Never show loading when offline
-    isInitialSync: isOnline ? isInitialSync : false, // Force isInitialSync off when offline
+    isLoading, // True only while loading local cache
+    isRemoteSyncing: isOnline ? isInitialSync : false, // True while initial remote sync
     error: error || driveError,
     createNote,
     updateNote,

@@ -6,13 +6,34 @@ import { useTagManagement } from '../../hooks/useTagManagement';
 import { useNotes } from '../../hooks/useNotes';
 
 export const TagManagementDialog = ({ open, onOpenChange }) => {
-    const { tags, createTag, updateTag, deleteTag } = useNotes();
+    const { tags, notes, createTag, updateTag, deleteTag } = useNotes();
     const { tagState, setTagState, dialogs, setDialogs, handleTagAction } = useTagManagement({
         tags,
         createTag,
         updateTag,
         deleteTag,
     });
+
+    // Calculate how many notes each tag is used in
+    const tagUsageCounts = tags.reduce((counts, tag) => {
+        // Count notes that have this tag - check both tags and tagIds fields
+        const count = notes?.filter(note => {
+            // Check if tag is in the tags array
+            if (note.tags && Array.isArray(note.tags)) {
+                return note.tags.some(tagId => tagId === tag.id || tagId === tag.id.toString());
+            }
+            
+            // Check if tag is in the tagIds array (alternate format)
+            if (note.tagIds && Array.isArray(note.tagIds)) {
+                return note.tagIds.some(tagId => tagId === tag.id || tagId === tag.id.toString());
+            }
+            
+            return false;
+        }).length || 0;
+        
+        counts[tag.id] = count;
+        return counts;
+    }, {});
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -29,6 +50,7 @@ export const TagManagementDialog = ({ open, onOpenChange }) => {
                     setTagState={setTagState}
                     setDialogs={setDialogs}
                     handleTagAction={handleTagAction}
+                    tagUsageCounts={tagUsageCounts}
                 />
                 <CreateTagDialog
                     open={dialogs.createTag}
@@ -43,6 +65,7 @@ export const TagManagementDialog = ({ open, onOpenChange }) => {
                     loading={false} // Assuming no loading state for simplicity
                     handleTagAction={handleTagAction}
                     tagId={tagState.tagToDelete}
+                    tagUsageCount={tagState.tagToDelete ? tagUsageCounts[tagState.tagToDelete] : 0}
                 />
             </DialogContent>
         </Dialog>

@@ -3,14 +3,23 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { ColorSelect, colorOptions } from './ColorSelect';
+import { FileText } from 'lucide-react';
 
-export const EditTagDialog = ({ open, onOpenChange, tagState, setTagState, handleTagAction, tag }) => {
+export const EditTagDialog = ({ open, onOpenChange, tagState, setTagState, handleTagAction, tag, tagUsageCount = 0 }) => {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="bg-bg-primary border-overlay/10 shadow-lg">
         <DialogHeader>
           <DialogTitle className="text-xl font-semibold text-text-primary">Edit Tag</DialogTitle>
-          <DialogDescription className="text-text-primary/60">Update the name and color of your tag.</DialogDescription>
+          <DialogDescription className="text-text-primary/60">
+            Update the name and color of your tag.
+            {tagUsageCount > 0 && (
+              <div className="flex items-center gap-1 mt-2 text-text-primary/70">
+                <FileText className="h-4 w-4" />
+                <span>Used in {tagUsageCount} {tagUsageCount === 1 ? 'note' : 'notes'}</span>
+              </div>
+            )}
+          </DialogDescription>
         </DialogHeader>
         <div className="py-4 space-y-4">
           <Input

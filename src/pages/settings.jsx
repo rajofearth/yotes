@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useSettings } from '../hooks/useSettings';
 import { SettingsHeader } from '../components/settings/SettingsHeader';
 import { DeleteAccountDialog } from '../components/settings/DeleteAccountDialog';
@@ -61,7 +61,24 @@ export default function Settings() {
         await handleDeleteAccount();
         navigate('/login');
     };
-    
+
+    // Calculate how many notes each tag is used in
+    const tagUsageCounts = useMemo(() => {
+        return tags.reduce((counts, tag) => {
+            const count = notes?.filter(note => {
+                if (note.tags && Array.isArray(note.tags)) {
+                    return note.tags.some(tagId => tagId === tag.id || tagId === tag.id.toString());
+                }
+                if (note.tagIds && Array.isArray(note.tagIds)) {
+                    return note.tagIds.some(tagId => tagId === tag.id || tagId === tag.id.toString());
+                }
+                return false;
+            }).length || 0;
+            counts[tag.id] = count;
+            return counts;
+        }, {});
+    }, [notes, tags]);
+
     return (
         <div className="min-h-screen bg-bg-primary text-text-primary flex flex-col">
             <SettingsHeader loading={loading} navigate={navigate} activeTab={activeTab} />
@@ -129,6 +146,7 @@ export default function Settings() {
                                         setTagState={setTagState}
                                         setDialogs={setDialogs}
                                         handleTagAction={handleTagAction}
+                                        tagUsageCounts={tagUsageCounts}
                                     />
                                 </div>
                             )}
@@ -179,6 +197,7 @@ export default function Settings() {
                 loading={loading}
                 handleTagAction={handleTagAction}
                 tagId={tagState.tagToDelete}
+                tagUsageCount={tagState.tagToDelete ? tagUsageCounts[tagState.tagToDelete] : 0}
             />
             <CreateTagDialog
                 open={dialogs.createTag}

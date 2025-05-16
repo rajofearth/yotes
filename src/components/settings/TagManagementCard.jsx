@@ -2,9 +2,10 @@
 import { useRef, useEffect, useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/card';
 import { Button } from '../ui/button';
-import { Plus, Trash2, Pencil, Tag as TagIcon, Search } from 'lucide-react';
+import { Plus, Trash2, Pencil, Tag as TagIcon, Search, FileText } from 'lucide-react';
 import { Input } from '../ui/input';
 import { EditTagDialog } from './EditTagDialog';
+import { Badge } from '../ui/badge';
 
 export const TagManagementCard = ({
   tags,
@@ -12,6 +13,7 @@ export const TagManagementCard = ({
   setTagState,
   setDialogs,
   handleTagAction,
+  tagUsageCounts = {}
 }) => {
   const scrollContainerRef = useRef(null);
   const [gradients, setGradients] = useState({ top: false, bottom: false });
@@ -92,7 +94,15 @@ export const TagManagementCard = ({
                 >
                   <div className="flex items-center gap-3 flex-1 truncate">
                     <div className={`w-4 h-4 rounded-full ${tag.color?.split(' ').find(c => c.startsWith('text-')) || 'text-gray-500'} bg-current flex-shrink-0`}></div>
-                    <span className="text-sm font-medium text-text-primary/90 truncate">{tag.name}</span>
+                    <div className="flex flex-col">
+                      <span className="text-sm font-medium text-text-primary/90 truncate">{tag.name}</span>
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <FileText className="h-3 w-3 text-text-primary/50" />
+                        <span className="text-xs text-text-primary/50">
+                          {tagUsageCounts[tag.id] || 0} {tagUsageCounts[tag.id] === 1 ? 'note' : 'notes'}
+                        </span>
+                      </div>
+                    </div>
                   </div>
                   <div className="flex items-center gap-1 flex-shrink-0">
                     <Button
@@ -168,6 +178,7 @@ export const TagManagementCard = ({
         setTagState={setTagState}
         handleTagAction={handleTagAction}
         tag={tags.find(t => t.id === tagState.editingId) || {}}
+        tagUsageCount={tagState.editingId ? tagUsageCounts[tagState.editingId] : 0}
       />
     </Card>
   );
