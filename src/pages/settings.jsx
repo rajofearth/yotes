@@ -5,15 +5,16 @@ import { DeleteAccountDialog } from '../components/settings/DeleteAccountDialog'
 import { DeleteTagDialog } from '../components/settings/DeleteTagDialog';
 import { CreateTagDialog } from '../components/settings/CreateTagDialog';
 import { UPIDonationDialog } from '../components/settings/UPIDonationDialog';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { TagManagementCard } from '../components/settings/TagManagementCard';
 import { StatisticsCard } from '../components/settings/StatisticsCard';
 import { AccountDetailsCard } from '../components/settings/AccountDetailsCard';
 import { NoteActivityCard } from '../components/settings/NoteActivityCard';
 import { DonationCard } from '../components/settings/DonationCard';
 import { AccountActionsCard } from '../components/settings/AccountActionsCard';
+import { AIFeaturesCard } from '../components/settings/AIFeaturesCard';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
-import { Settings as SettingsIcon, User, Tag, BarChart, Heart, Shield } from 'lucide-react';
+import { Settings as SettingsIcon, User, Tag, BarChart, Heart, Shield, Brain } from 'lucide-react';
 
 export default function Settings() {
     const {
@@ -27,9 +28,13 @@ export default function Settings() {
         handleDeleteAccount,
         handleTagAction,
         noteActivity,
+        aiSettings,
+        handleSaveApiKey,
+        handleToggleAiFeatures,
     } = useSettings();
     const navigate = useNavigate();
-    const [activeTab, setActiveTab] = useState("account");
+    const location = useLocation();
+    const [activeTab, setActiveTab] = useState(location.state?.activeTab || "account");
     const [isMobile, setIsMobile] = useState(false);
     const [dialogs, setDialogs] = useState({
         deleteAccount: false,
@@ -106,6 +111,10 @@ export default function Settings() {
                                         <BarChart className="h-4 w-4" />
                                         <span className="hidden sm:inline">Statistics</span>
                                     </TabsTrigger>
+                                    <TabsTrigger value="ai" className="flex items-center gap-2 justify-start md:w-full text-left whitespace-nowrap">
+                                        <Brain className="h-4 w-4" />
+                                        <span className="hidden sm:inline">AI Features</span>
+                                    </TabsTrigger>
                                     <TabsTrigger value="support" className="flex items-center gap-2 justify-start md:w-full text-left whitespace-nowrap">
                                         <Heart className="h-4 w-4" />
                                         <span className="hidden sm:inline">Support</span>
@@ -163,6 +172,19 @@ export default function Settings() {
                                     <h2 className="text-lg sm:text-xl font-semibold mb-2 sm:mb-4">Support Us</h2>
                                     <div className="max-w-lg">
                                         <DonationCard setDialogs={setDialogs} />
+                                    </div>
+                                </div>
+                            )}
+                            
+                            {activeTab === "ai" && (
+                                <div className="space-y-4 sm:space-y-6">
+                                    <h2 className="text-lg sm:text-xl font-semibold mb-2 sm:mb-4">AI Features</h2>
+                                    <div className="max-w-lg">
+                                        <AIFeaturesCard
+                                            aiSettings={aiSettings}
+                                            onSaveApiKey={handleSaveApiKey}
+                                            onToggleAiFeatures={handleToggleAiFeatures}
+                                        />
                                     </div>
                                 </div>
                             )}

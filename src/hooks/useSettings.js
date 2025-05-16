@@ -5,6 +5,7 @@ import { useNotes } from './useNotes';
 import { useToast } from '../contexts/ToastContext';
 import { getFromDB, setInDB, clearDB } from '../utils/indexedDB';
 import { useOnlineStatus } from '../contexts/OnlineStatusContext';
+import { useAISettings } from './useAISettings';
 
 export const findSupabaseLocalStorageKey = () => {
     if (typeof window === 'undefined' || !window.localStorage) return null;
@@ -19,8 +20,16 @@ export const useSettings = () => {
     const navigate = useNavigate();
     const isOnline = useOnlineStatus();
     const { notes, tags, createTag, updateTag, deleteTag } = useNotes();
+    const { 
+        aiSettings, 
+        loading: aiLoading, 
+        error: aiError, 
+        toggleAiFeatures, 
+        saveApiKey, 
+        refreshAISettings 
+    } = useAISettings();
     const [user, setUser] = useState(null);
-    const [loading, setLoading] = useState({ logout: false, delete: false, tagDelete: false, user: true });
+    const [loading, setLoading] = useState({ logout: false, delete: false, tagDelete: false, user: true, ai: false });
     const [tagState, setTagState] = useState({ newName: '', newColor: 'bg-purple-600/20 text-purple-600', editingId: null, editingName: '', editingColor: '', tagToDelete: null });
     const [noteActivity, setNoteActivity] = useState([]);
 
@@ -121,7 +130,53 @@ export const useSettings = () => {
         } finally { if (isDelete) setLoading(prev => ({ ...prev, tagDelete: false })); }
     }, [createTag, updateTag, deleteTag, showToast]);
 
+    // Handle AI features toggle
+    const handleToggleAiFeatures = useCallback(async (enabled) => {
+        setLoading(prev => ({ ...prev, ai: true }));
+        try {
+            await toggleAiFeatures(enabled);
+            showToast(`AI features ${enabled ? 'enabled' : 'disabled'} successfully`, 'success');
+            
+            // If enabling but no API key, show info toast
+            if (enabled && !aiSettings.apiKey) {
+                showToast('Please add your Google Gemini API key to use AI features', 'info');
+            }
+        } catch (error) {
+            console.error('Failed to toggle AI features:', error);
+            showToast(`Failed to toggle AI features: ${error.message}`, 'error');
+        } finally {
+            setLoading(prev => ({ ...prev, ai: false }));
+        }
+    }, [toggleAiFeatures, aiSettings, showToast]);
+
+    // Handle API key saving
+    const handleSaveApiKey = useCallback(async (apiKey) => {
+        setLoading(prev => ({ ...prev, ai: true }));
+        try {
+            await saveApiKey(apiKey);
+            return true;
+        } catch (error) {
+            console.error('Failed to save API key:', error);
+            throw new Error(error.message || 'Failed to save API key');
+        } finally {
+            setLoading(prev => ({ ...prev, ai: false }));
+        }
+    }, [saveApiKey]);
+
     return {
-        user, notes, tags, loading, tagState, setTagState, handleLogout, handleDeleteAccount, handleTagAction, noteActivity
+        user, 
+        notes, 
+        tags, 
+        loading: { ...loading, ai: aiLoading }, 
+        tagState, 
+        setTagState, 
+        handleLogout, 
+        handleDeleteAccount, 
+        handleTagAction, 
+        noteActivity,
+        // AI settings
+        aiSettings,
+        handleSaveApiKey,
+        handleToggleAiFeatures
     };
 };
