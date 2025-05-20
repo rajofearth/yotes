@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import GoogleButton from '../../components/ui/google-button';
 import { useLoginLogic } from '../../hooks/loginLogic';
 import { useToast } from '../../contexts/ToastContext';
@@ -44,6 +44,15 @@ export default function Login() {
           </p>
         </div>
       </div>
+      <footer className="absolute bottom-0 left-0 right-0 p-4 text-center text-sm text-gray-500">
+        <Link to="/privacy" className="hover:text-gray-300 mx-2">
+          Privacy Policy
+        </Link>
+        |
+        <Link to="/terms" className="hover:text-gray-300 mx-2">
+          Terms & Conditions
+        </Link>
+      </footer>
     </div>
   );
 }

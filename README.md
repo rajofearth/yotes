@@ -32,7 +32,7 @@ _Yotes interface on a mobile device_
 ## Planned Features (TODO)
 
 From Yashraj’s rough TODO list, here’s what’s in the pipeline:
-- [ ] Static pages: Homepage, Privacy Policy, and Terms & Conditions.
+- [x] Static pages: Homepage, Privacy Policy, and Terms & Conditions.
 - [ ] Export/import functionality.
 - [ ] PDF viewer and download capabilities.
 - [ ] Rich previews for links (e.g., website showcases, YouTube embeds).

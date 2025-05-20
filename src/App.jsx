@@ -20,6 +20,9 @@ import AuthCallback from './pages/auth/callback';
 import Settings from './pages/settings';
 const SectionView = lazy(() => import('./pages/section/[id]'));
 import NoteEditor from './pages/note/NoteEditor';
+import StaticHomepage from './pages/public/StaticHomepage';
+import PrivacyPolicy from './pages/public/PrivacyPolicy';
+import TermsAndConditions from './pages/public/TermsAndConditions';
 import ErrorBoundary from './components/ErrorBoundary';
 import ProgressBar from './components/ProgressBar';
 import PWAReloadPrompt from './components/PWAReloadPrompt';
@@ -103,9 +106,12 @@ function AppContent({ session, isAuthLoading, isInitialLoad, setIsInitialLoad })
     // Routes for logged-out users
     return (
       <Routes>
+        <Route path="/" element={<StaticHomepage />} />
         <Route path="/login" element={<Login />} />
         <Route path="/auth/callback" element={<AuthCallback />} />
-        <Route path="*" element={<Navigate to="/login" replace />} />
+        <Route path="/privacy" element={<PrivacyPolicy />} />
+        <Route path="/terms" element={<TermsAndConditions />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     );
   }
