@@ -1,6 +1,6 @@
 # Yotes
 
-Yotes is a privacy-first web application designed to empower users with full control over their data. More than just a notes app, Yotes integrates with your Google Drive to securely store and manage notes, documents (PDFs, Docs, Excel, PPTs), and other resources—all without subscription fees, as it leverages your own Google Drive storage. Built with a sleek, dark-themed interface using React and Tailwind CSS, Yotes aims to centralize your resources in one intuitive hub. Check out the live site at [yotes.vercel.app](https://yotes.vercel.app).
+Yotes is a privacy-first web application designed to empower users with full control over their data. More than just a notes app, Yotes integrates with your Google Drive to securely store and manage notes, documents (like PDFs, Docs, Excel, PPTs), media files, and other digital resources—all without subscription fees, as it leverages your own Google Drive storage. Built with a sleek, dark-themed interface using React and Tailwind CSS, Yotes aims to centralize your resources in one intuitive hub. Check out the live site at [yotes.vercel.app](https://yotes.vercel.app).
 
 ## Vision
 
@@ -17,20 +17,26 @@ Yotes prioritizes user privacy by ensuring all data stays within your Google Dri
 - **Google OAuth**: Secure sign-in via Supabase authentication.
 - **Dark Theme**: Default dark mode with JetBrains Mono font for a developer-friendly experience.
 - **Toast Notifications**: Real-time feedback for actions like saving or errors.
+- **Offline Access**: Work with notes offline; changes sync upon reconnection.
+- **Installable PWA**: Add Yotes to your home screen for a native app-like experience.
+- **AI-Powered Search Summaries**: Get intelligent summaries of search results, highlighting themes and takeaways (powered by Google Gemini).
+
+## Screenshots
+
+![Yotes Desktop View](./public/screenshot-desktop-1.png)
+_Yotes interface on a desktop device_
+
+![Yotes Mobile View](./public/screenshot-mobile-1.png)
+_Yotes interface on a mobile device_
 
 ## Planned Features (TODO)
 
 From Yashraj’s rough TODO list, here’s what’s in the pipeline:
-- [x] Enhanced edit page UI/UX.
-- [x] Improved loading indicators with timestamps on note cards.
-- [x] Tag creation fix for mobile devices.
 - [ ] Static pages: Homepage, Privacy Policy, and Terms & Conditions.
-- [x] Caching for account details and offline access.
 - [ ] Export/import functionality.
-- [x] Progressive Web App (PWA) support.
 - [ ] PDF viewer and download capabilities.
 - [ ] Rich previews for links (e.g., website showcases, YouTube embeds).
-- [ ] AI-powered description generator and search summaries.
+- [ ] AI-powered note assistance (e.g., description generation, in-note Q&A)
 - [ ] Markdown support for notes.
 - [ ] Dedicated support for dropping files (images, videos, links) with specialized views.
 
@@ -39,6 +45,8 @@ From Yashraj’s rough TODO list, here’s what’s in the pipeline:
 - **Frontend**: React, React Router, Vite
 - **Styling**: Tailwind CSS, shadcn/ui, Lucide icons
 - **Integration**: Google Drive API, Supabase Auth
+- **Offline & PWA**: IndexedDB (for offline storage), Workbox (for PWA and service worker management)
+- **AI**: Google Gemini API (for AI features)
 - **State Management**: React Contexts (GoogleDriveContext, ToastContext, ThemeContext)
 - **Build Tools**: Vite, ESLint, PostCSS
 - **Dependencies**: See `package.json`
