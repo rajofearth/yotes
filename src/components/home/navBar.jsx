@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
-import { Plus, Search, FileText, LogOut, Upload, Settings, User as UserIcon } from 'lucide-react'; // Added UserIcon
+import { Plus, Search, FileText, LogOut, Upload, Settings, User as UserIcon, ImageIcon } from 'lucide-react'; // Added UserIcon and ImageIcon
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -111,9 +111,10 @@ export default function NavBar({ onSearch }) {
                 </DropdownMenuItem>
                 <DropdownMenuSeparator className="bg-overlay/10" />
                 <DropdownMenuItem 
-                  className="flex items-center gap-2 text-text-primary/40"
+                  className="flex items-center gap-2 text-text-primary hover:bg-overlay/10 cursor-pointer"
+                  onClick={() => navigate('/create-from-image')}
                 >
-                  <LogOut className="h-4 w-4" />
+                  <ImageIcon className="h-4 w-4" />
                   <div className="flex flex-col">
                     <span className="text-sm">Image Note</span>
                     <span className="text-xs text-text-primary/60">Create with image</span>
