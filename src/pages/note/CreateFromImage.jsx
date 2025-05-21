@@ -6,6 +6,8 @@ import { Camera, Upload, ArrowRight, Loader2, AlertTriangle, Save } from 'lucide
 import { generateNoteFromImage } from '../../utils/geminiService';
 import { NoteForm } from '../../components/note/NoteForm';
 import { useNotes } from '../../hooks/useNotes';
+import { useAISettings } from '../../hooks/useAISettings'; // Import useAISettings
+import { Input } from '../../components/ui/input'; // Ensure Input is imported
 
 export default function CreateFromImage() {
   const [selectedImage, setSelectedImage] = useState(null);
@@ -18,7 +20,10 @@ export default function CreateFromImage() {
 
   const fileInputRef = useRef(null);
   const navigate = useNavigate();
-  const { createNote, tags: allTags, refreshTags } = useNotes(); // Assuming useNotes provides tags and a way to refresh them
+  const { createNote, tags: allTags, refreshTags } = useNotes();
+
+  // AI Settings
+  const { settings: aiSettings, loading: isLoadingAISettings, error: aiSettingsError } = useAISettings();
 
   // Refs for NoteForm inputs
   const titleInputRef = useRef(null);
@@ -47,15 +52,21 @@ export default function CreateFromImage() {
   };
 
   const handleProcessImage = async () => {
-    if (!selectedImageFile) return; // Use selectedImageFile
+    if (!selectedImageFile) return;
+    if (!aiSettings?.enabled) {
+      setProcessingError("AI features are disabled. Please enable them in settings.");
+      return;
+    }
+    if (!aiSettings?.apiKey) {
+      setProcessingError("AI API Key is not configured. Please set it in settings.");
+      return;
+    }
+
     setIsProcessing(true);
     setProcessingError(null);
     try {
-      // Pass selectedImageFile (File object) or selectedImage (base64 string)
-      // depending on what generateNoteFromImage expects.
-      // For this example, let's assume it can handle the base64 string (selectedImage)
-      // or we can adapt it to send selectedImageFile if it's a true API call.
-      const noteData = await generateNoteFromImage(selectedImageFile); 
+      // Pass selectedImageFile. The apiKey will be used by geminiService directly in a later step.
+      const noteData = await generateNoteFromImage(selectedImageFile, aiSettings.apiKey); 
       setGeneratedNote({
         title: noteData.title || '',
         description: noteData.description || '',
@@ -207,6 +218,38 @@ export default function CreateFromImage() {
     );
   }
 
+  if (isLoadingAISettings) {
+    return (
+      <div className="container mx-auto p-4 sm:p-6 lg:p-8 max-w-2xl text-center">
+        <Loader2 className="mx-auto h-12 w-12 animate-spin text-primary mb-4" />
+        <p className="text-text-primary/80">Loading AI settings...</p>
+      </div>
+    );
+  }
+
+  if (aiSettingsError) {
+    return (
+      <div className="container mx-auto p-4 sm:p-6 lg:p-8 max-w-2xl text-center">
+        <AlertTriangle className="mx-auto h-12 w-12 text-red-500 mb-4" />
+        <p className="text-red-500">Error loading AI settings: {aiSettingsError.message}</p>
+        <p className="text-text-primary/60 mt-2">Please try again later or check your configuration.</p>
+         <Button variant="outline" onClick={() => navigate('/settings')} className="mt-4">Go to Settings</Button>
+      </div>
+    );
+  }
+
+  // Determine if AI functionality should be disabled
+  const aiFeaturesDisabled = !aiSettings?.enabled;
+  const apiKeyMissing = aiSettings?.enabled && !aiSettings?.apiKey;
+  const cannotProcess = aiFeaturesDisabled || apiKeyMissing;
+
+  let aiDisabledMessage = null;
+  if (aiFeaturesDisabled) {
+    aiDisabledMessage = "AI features are currently disabled. Please enable them in Settings -> AI Features to use this functionality.";
+  } else if (apiKeyMissing) {
+    aiDisabledMessage = "AI API Key not configured. Please set it in Settings -> AI Features.";
+  }
+
   return (
     <div className="container mx-auto p-4 sm:p-6 lg:p-8 max-w-2xl">
       <Card className="bg-bg-primary border-overlay/10 shadow-lg">
@@ -216,12 +259,22 @@ export default function CreateFromImage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
+          {aiDisabledMessage && (
+            <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4" role="alert">
+              <p className="font-bold">AI Features Notice</p>
+              <p>{aiDisabledMessage}</p>
+              <Button variant="link" onClick={() => navigate('/settings')} className="p-0 h-auto text-yellow-700 hover:text-yellow-800">Go to Settings</Button>
+            </div>
+          )}
+
           {!selectedImage && (
             <div className="flex flex-col sm:flex-row justify-around items-center gap-4">
               <Button
                 variant="outline"
                 className="w-full sm:w-auto border-primary text-primary hover:bg-primary/10"
                 onClick={() => console.log('Take Picture clicked')} // Placeholder action
+                disabled={cannotProcess}
+                title={cannotProcess ? aiDisabledMessage : "Take a picture"}
               >
                 <Camera className="mr-2 h-5 w-5" />
                 Take Picture
@@ -230,6 +283,8 @@ export default function CreateFromImage() {
                 variant="outline"
                 className="w-full sm:w-auto border-primary text-primary hover:bg-primary/10"
                 onClick={triggerFileDialog}
+                disabled={cannotProcess}
+                title={cannotProcess ? aiDisabledMessage : "Upload an image"}
               >
                 <Upload className="mr-2 h-5 w-5" />
                 Upload Image
@@ -280,8 +335,9 @@ export default function CreateFromImage() {
           <div className="mt-8 flex justify-end">
             <Button
               onClick={handleProcessImage}
-              disabled={!selectedImage || isProcessing}
+              disabled={!selectedImage || isProcessing || cannotProcess}
               className="bg-primary text-primary-foreground hover:bg-primary/90 min-w-[150px]"
+              title={cannotProcess ? aiDisabledMessage : "Process the uploaded image"}
             >
               {isProcessing ? (
                 <Loader2 className="mr-2 h-5 w-5 animate-spin" />
@@ -298,7 +354,8 @@ export default function CreateFromImage() {
 }
 
 // Fallback ImageIcon if lucide-react's one is not directly used or for placeholder purposes
-const ImageIcon = (props) => (
+// Ensure this component is defined or imported if used in the placeholder
+const ImageIcon = (props) => ( 
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
     <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
     <circle cx="8.5" cy="8.5" r="1.5"></circle>

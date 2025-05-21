@@ -19,6 +19,7 @@ import Login from './pages/auth/login'; // Ensure correct path
 import AuthCallback from './pages/auth/callback';
 import Settings from './pages/settings';
 const SectionView = lazy(() => import('./pages/section/[id]'));
+const CreateFromImage = lazy(() => import('./pages/note/CreateFromImage'));
 import NoteEditor from './pages/note/NoteEditor';
 import StaticHomepage from './pages/public/StaticHomepage';
 import PrivacyPolicy from './pages/public/PrivacyPolicy';
@@ -192,6 +193,7 @@ function AppContent({ session, isAuthLoading, isInitialLoad, setIsInitialLoad })
           <Route path="/settings" element={<Settings />} />
           <Route path="/section/:id" element={<SectionView />} />
           <Route path="/create" element={<NoteEditor />} />
+          <Route path="/create-from-image" element={<CreateFromImage />} />
           <Route path="/login" element={<Navigate to="/" replace />} />
           <Route path="/auth/callback" element={<Navigate to="/" replace />} />
           <Route path="*" element={<Navigate to="/" replace />} />

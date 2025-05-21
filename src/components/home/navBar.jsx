@@ -14,13 +14,15 @@ import { supabase } from '../../utils/supabaseClient';
 import { getFromDB, setInDB, openDB } from '../../utils/indexedDB';
 import { useOnlineStatus } from '../../contexts/OnlineStatusContext';
 import { useSettings } from '../../hooks/useSettings';
+import { useAISettings } from '../../hooks/useAISettings'; // Import useAISettings
 
 export default function NavBar({ onSearch }) {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true); // This is for user session loading
   const isOnline = useOnlineStatus();
   const { handleLogout } = useSettings();
+  const { settings: aiSettings, loading: isLoadingAISettings } = useAISettings();
 
   useEffect(() => {
     let isMounted = true;
@@ -110,9 +112,22 @@ export default function NavBar({ onSearch }) {
                   </div>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator className="bg-overlay/10" />
-                <DropdownMenuItem 
-                  className="flex items-center gap-2 text-text-primary hover:bg-overlay/10 cursor-pointer"
-                  onClick={() => navigate('/create-from-image')}
+                <DropdownMenuItem
+                  className={`flex items-center gap-2 text-text-primary hover:bg-overlay/10 cursor-pointer ${
+                    (isLoadingAISettings || !aiSettings?.enabled || !aiSettings?.apiKey) ? 'opacity-50 cursor-not-allowed' : ''
+                  }`}
+                  onClick={() => {
+                    if (!isLoadingAISettings && aiSettings?.enabled && aiSettings?.apiKey) {
+                      navigate('/create-from-image');
+                    }
+                  }}
+                  disabled={isLoadingAISettings || !aiSettings?.enabled || !aiSettings?.apiKey}
+                  title={
+                    isLoadingAISettings ? "Loading AI settings..." :
+                    !aiSettings?.enabled ? "AI features are disabled in settings." :
+                    !aiSettings?.apiKey ? "AI API key is not configured in settings." :
+                    "Create a new note from an image"
+                  }
                 >
                   <ImageIcon className="h-4 w-4" />
                   <div className="flex flex-col">
@@ -121,7 +136,7 @@ export default function NavBar({ onSearch }) {
                   </div>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator className="bg-overlay/10" />
-                <DropdownMenuItem 
+                <DropdownMenuItem
                   className="flex items-center gap-2 text-text-primary/40 opacity-50 cursor-not-allowed"
                 >
                   <Upload className="h-4 w-4" />
