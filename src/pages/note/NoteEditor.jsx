@@ -1,16 +1,18 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useNotes } from '../../hooks/useNotes';
 import { useToast } from '../../contexts/ToastContext';
 import { NoteForm } from '../../components/note/NoteForm';
 import { NoteEditorHeader } from '../../components/note/NoteEditorHeader';
 import { TagManagementDialog } from '../../components/settings/TagManagementDialog';
 import { Loader2 } from 'lucide-react';
+import { generateNoteFromImage } from '../../utils/aiImageService';
 
 export default function NoteEditor() {
   const { id: noteId } = useParams(); // Get note ID from params (if editing)
   const navigate = useNavigate();
-  const { createNote, updateNote, notes, tags, createTag, isLoading: isNotesLoading } = useNotes();
+  const location = useLocation();
+  const { createNote, updateNote, notes, tags, createTag, isLoading: isNotesLoading, allTags } = useNotes();
   const showToast = useToast();
 
   const [isSaving, setIsSaving] = useState(false);
@@ -21,13 +23,70 @@ export default function NoteEditor() {
     content: '',
     tags: [],
   });
+  const [isImportingImage, setIsImportingImage] = useState(false);
   const [isTagManagementOpen, setIsTagManagementOpen] = useState(false);
   const [lastSaved, setLastSaved] = useState(null);
   const titleInputRef = useRef(null);
   const descriptionRef = useRef(null);
   const contentRef = useRef(null);
   const isCreate = !noteId;
+  // Ref to ensure image data is applied only once
+  const appliedImageData = useRef(false);
+  
+  // Handle importing note fields from an image (moved up and using useCallback)
+  const handleImportImage = useCallback(async (file) => {
+    setIsImportingImage(true);
+    try {
+      const fields = await generateNoteFromImage(file);
+      // Update note with returned fields
+      setNote(prev => ({
+        ...prev,
+        title: fields.title || prev.title,
+        description: fields.description || prev.description,
+        content: fields.content || prev.content,
+      }));
+      setHasChanges(true);
+      showToast('Note fields populated from image', 'success');
+      appliedImageData.current = true; // Mark as applied to prevent duplicate processing
+    } catch (error) {
+      console.error('Image import error:', error);
+      showToast(error.message || 'Failed to import from image', 'error');
+    } finally {
+      setIsImportingImage(false);
+    }
+  }, [showToast, setNote, setHasChanges]);
 
+  // Handle image data passed from image upload modal
+  useEffect(() => {
+    // Check if noteData is passed
+    const data = location.state?.noteData;
+    if (data && isCreate && !appliedImageData.current) {
+      // Update note with returned fields (similar to handleImportImage)
+      setNote(prev => ({
+        ...prev,
+        title: data.title || prev.title,
+        description: data.description || prev.description,
+        content: data.content || prev.content,
+      }));
+      
+      setHasChanges(true);
+      appliedImageData.current = true;
+      
+      // Clear location state to avoid re-trigger
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+    
+    // Check if raw image file is passed from ImageUploadModal
+    const imageFile = location.state?.imageFile;
+    if (imageFile && isCreate && !appliedImageData.current) {
+      // Process the image using the same function as the camera button
+      handleImportImage(imageFile);
+      
+      // Clear location state to avoid re-trigger
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.state, isCreate, navigate, handleImportImage]);
+  
   // Load draft from localStorage when creating a new note
   useEffect(() => {
     if (isCreate) {
@@ -198,6 +257,8 @@ export default function NoteEditor() {
         isSaving={isSaving}
         hasChanges={hasChanges}
         lastSaved={lastSaved}
+        onImportImage={handleImportImage}
+        isImportingImage={isImportingImage}
         onSave={handleSave}
         titleInputRef={titleInputRef}
       />

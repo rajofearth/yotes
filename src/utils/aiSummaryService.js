@@ -130,4 +130,6 @@ Respond with ONLY the JSON object and no additional text.`
     console.error('Error generating AI summary:', error);
     throw error;
   }
-}; 
+};
+
+export { getAISettings }; 

@@ -104,26 +104,25 @@ export default function CreateFromImage() {
     });
   }, []);
 
-  const handleCreateTag = useCallback(async (tagName) => {
-    // This is a simplified version. Ideally, useNotes would handle tag creation
-    // and return the new tag object (including its ID).
-    // For now, we'll just add the name. If your TagSelector/NoteForm expects tag objects, adjust accordingly.
-    const newTag = { id: tagName.toLowerCase().replace(/\s+/g, '-'), name: tagName }; // Mock ID
-    
-    setGeneratedNote(prevNote => ({
-      ...prevNote,
-      tags: [...prevNote.tags, newTag.id] // Assuming tags are stored by ID
-    }));
-    // Potentially add to allTags if not automatically updated by useNotes
-    // This part depends on how useNotes and TagSelector manage the global list of tags
-    if (allTags && !allTags.find(t => t.id === newTag.id)) {
-        // You might need a function in useNotes to add a tag to the global list
-        // and then refreshTags() or similar.
-        // For now, this won't update the global `allTags` used by TagSelector unless `useNotes` handles it.
-        console.warn("New tag created locally. Global tag list might need update.");
+const handleCreateTag = useCallback(async (action, data) => {
+  if (action === 'create' && data?.name) {
+    try {
+      const newTag = await createTag({ 
+        name: data.name, 
+        color: data.color || 'bg-gray-500/20 text-gray-500' 
+      });
+      setGeneratedNote(prev => ({ 
+        ...prev, 
+        tags: [...prev.tags, newTag.id] 
+      }));
+      // No need to manually update allTags as the useNotes hook should handle this
+      return newTag;
+    } catch (error) {
+      console.error('Tag creation error:', error);
+      // Consider showing an error toast here
     }
-    return newTag; // Return the new tag, as TagSelector might expect this
-  }, [allTags]);
+  }
+}, [allTags]);
 
 
   const handleSaveNote = async () => {

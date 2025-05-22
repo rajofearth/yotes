@@ -62,24 +62,3 @@ export const generateNoteFromImage = async (imageData, apiKey) => {
   console.log('Simulated Gemini API response:', simulatedResponse);
   return simulatedResponse;
 };
-
-// Example of how this might be used (for testing purposes, can be removed):
-/*
-(async () => {
-  if (typeof window !== 'undefined') { // Basic check to ensure it runs in a browser-like env for testing
-    try {
-      console.log('Testing generateNoteFromImage...');
-      const fakeImageData = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAUA
-AAAFCAYAAACNbyblAAAAHElEQVQI12P4//8/w38GIAXDIBKE0DHxgljNBAAO
-9TXL0Y4OHwAAAABJRU5ErkJggg=='; // A tiny red dot png
-      // For testing with a key:
-      // const note = await generateNoteFromImage(fakeImageData, "test-api-key"); 
-      // For testing without a key:
-      // const note = await generateNoteFromImage(fakeImageData, null);
-      console.log('Generated note (or error):', note);
-    } catch (error) {
-      console.error('Test failed (expected if API key was missing):', error);
-    }
-  }
-})();
-*/
