@@ -90,11 +90,16 @@ export const useSettings = () => {
     const handleLogout = async () => {
         if (!isOnline) { showToast('Cannot log out while offline.', 'error'); return; }
         setLoading(prev => ({ ...prev, logout: true })); let success = false;
-        try { const { error } = await supabase.auth.signOut(); if (error) throw error; success = true; }
+        try { 
+            // Delete IndexedDB first
+            await clearDB().catch(e => console.error("Clear DB error on logout:", e));
+            const { error } = await supabase.auth.signOut(); 
+            if (error) throw error; 
+            success = true; 
+        }
         catch(error) { showToast('Failed to log out', 'error'); console.error("Logout error:", error); }
         if(success) {
             showToast('Logged out successfully.', 'success');
-            await clearDB().catch(e => console.error("Clear DB error on logout:", e));
             const key = findSupabaseLocalStorageKey(); if (key && typeof window !== 'undefined') localStorage.removeItem(key);
         }
         setLoading(prev => ({ ...prev, logout: false }));
