@@ -147,13 +147,13 @@ export function GoogleDriveProvider({ session, children }) {
             clearTimeout(refreshTimer);
 
             if (err.message.includes('No refresh token available') || err.message.includes('invalid_grant')) {
-                showToast(`Google Drive access error. Please sign in again.`, 'error');
+                showToast(`Google Drive access error: ${err.message}. Please sign in again.`, 'error');
                 await supabase.auth.signOut().catch(e => console.error("Sign out error during refresh failure", e));
                 await clearDB().catch(e => console.error("Clear DB error during refresh failure", e));
                 const supabaseKey = findSupabaseLocalStorageKey();
                 if (supabaseKey && typeof window !== 'undefined') localStorage.removeItem(supabaseKey);
             } else {
-                showToast('Failed to refresh Google Drive token.', 'error');
+                showToast(err.message || 'Failed to refresh Google Drive token.', 'error');
             }
             return null;
         } finally {
@@ -200,37 +200,55 @@ export function GoogleDriveProvider({ session, children }) {
                 return;
             }
 
-            const currentRefreshToken = session.provider_refresh_token;
-            // Always store the latest refresh token from the session prop
-            if (currentRefreshToken) {
-                 setRefreshTokenValue(currentRefreshToken);
-                 // Also ensure it's in IndexedDB & LocalStorage if missing/different (optional safety net)
-                 const dbSession = await getFromDB('sessions', 'session') || {};
-                 if (dbSession.provider_refresh_token !== currentRefreshToken) {
-                     dbSession.provider_refresh_token = currentRefreshToken;
-                     await setInDB('sessions', 'session', dbSession);
-
-                     const supabaseKey = findSupabaseLocalStorageKey();
-                     if (supabaseKey && window.localStorage) {
-                         try {
+            // Defensive: Try to get refresh token from session, then IndexedDB, then localStorage
+            let currentRefreshToken = session?.provider_refresh_token;
+            if (!currentRefreshToken) {
+                // Try IndexedDB
+                const dbSession = await getFromDB('sessions', 'session');
+                if (dbSession?.provider_refresh_token) {
+                    currentRefreshToken = dbSession.provider_refresh_token;
+                    setRefreshTokenValue(currentRefreshToken);
+                    // Sync to localStorage if needed
+                    const supabaseKey = findSupabaseLocalStorageKey();
+                    if (supabaseKey && window.localStorage) {
+                        try {
                             const storedSessionStr = localStorage.getItem(supabaseKey);
-                            if (storedSessionStr) {
-                                const storedSession = JSON.parse(storedSessionStr);
-                                if(storedSession.provider_refresh_token !== currentRefreshToken) {
-                                    storedSession.provider_refresh_token = currentRefreshToken;
-                                    localStorage.setItem(supabaseKey, JSON.stringify(storedSession));
-                                }
+                            let storedSession = storedSessionStr ? JSON.parse(storedSessionStr) : {};
+                            if (storedSession.provider_refresh_token !== currentRefreshToken) {
+                                storedSession.provider_refresh_token = currentRefreshToken;
+                                localStorage.setItem(supabaseKey, JSON.stringify(storedSession));
                             }
-                         } catch (e) { console.error("Error updating refresh token in LS during init:", e); }
-                     }
-                 }
+                        } catch (e) { console.error("Error updating refresh token in LS during defensive init:", e); }
+                    }
+                }
             } else {
-                 // If session exists but refresh token doesn't, it's an issue.
-                 console.warn("GoogleDriveProvider: Session exists but provider_refresh_token is missing.");
-                 setRefreshTokenValue(null);
-                 // Attempting refresh might fail, but let's try, it might use older stored token
+                setRefreshTokenValue(currentRefreshToken);
+                // Also ensure it's in IndexedDB & LocalStorage if missing/different
+                const dbSession = await getFromDB('sessions', 'session') || {};
+                if (dbSession.provider_refresh_token !== currentRefreshToken) {
+                    dbSession.provider_refresh_token = currentRefreshToken;
+                    await setInDB('sessions', 'session', dbSession);
+                }
+                const supabaseKey = findSupabaseLocalStorageKey();
+                if (supabaseKey && window.localStorage) {
+                    try {
+                        const storedSessionStr = localStorage.getItem(supabaseKey);
+                        if (storedSessionStr) {
+                            const storedSession = JSON.parse(storedSessionStr);
+                            if(storedSession.provider_refresh_token !== currentRefreshToken) {
+                                storedSession.provider_refresh_token = currentRefreshToken;
+                                localStorage.setItem(supabaseKey, JSON.stringify(storedSession));
+                            }
+                        }
+                    } catch (e) { console.error("Error updating refresh token in LS during init:", e); }
+                }
             }
-
+            if (!currentRefreshToken) {
+                // If session exists but refresh token doesn't, it's an issue.
+                console.warn("GoogleDriveProvider: Session exists but provider_refresh_token is missing.");
+                setRefreshTokenValue(null);
+                // Attempting refresh might fail, but let's try, it might use older stored token
+            }
 
             const nowSeconds = Math.floor(Date.now() / 1000);
             const tokenExpiry = session.expires_at;

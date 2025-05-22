@@ -159,7 +159,7 @@ export const AIFeaturesCard = ({ aiSettings, onSaveApiKey, onToggleAiFeatures })
                         }
                       </p>
                       <p className="text-xs text-text-primary/60">
-                        You can get a Gemini API key from the <a href="https://ai.google.dev/" target="_blank" rel="noopener noreferrer" className="text-primary underline">Google AI Studio</a>.
+                        You can get a Gemini API key from the <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" className="text-primary underline">Google AI Studio</a>.
                       </p>
                     </div>
                   </div>

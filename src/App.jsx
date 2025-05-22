@@ -15,7 +15,7 @@ import { SyncTriggerBadge } from './components/SyncTriggerBadge';
 import { SyncProgressOverlay } from './components/SyncProgressOverlay';
 import ViewNote from './pages/note/view/[id]';
 import Home from './pages/home';
-import Login from './pages/auth/login'; // Ensure correct path
+import Login from './pages/login'; 
 import AuthCallback from './pages/auth/callback';
 import Settings from './pages/settings';
 const SectionView = lazy(() => import('./pages/section/[id]'));

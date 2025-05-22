@@ -7,7 +7,7 @@ import { getFromDB, setInDB } from '../utils/indexedDB';
 const AI_SETTINGS_FILE_NAME = 'ai-settings.json';
 
 export const useAISettings = () => {
-  const { driveApi } = useGoogleDrive();
+  const { driveApi, folderIds } = useGoogleDrive();
   const isOnline = useOnlineStatus();
   const [aiSettings, setAiSettings] = useState({
     enabled: false,
@@ -33,10 +33,15 @@ export const useAISettings = () => {
       return;
     }
 
+    if (!folderIds?.root) {
+      // Wait for the app folder to be initialized before loading settings
+      return;
+    }
+
     setLoading(true);
     try {
       // Search for the settings file in Google Drive
-      const listResponse = await driveApi.listFiles(null, `name='${AI_SETTINGS_FILE_NAME}'`);
+      const listResponse = await driveApi.listFiles(folderIds.root, `name='${AI_SETTINGS_FILE_NAME}'`);
       const files = listResponse.files;
       
       if (files && files.length > 0) {
@@ -68,7 +73,7 @@ export const useAISettings = () => {
     } finally {
       setLoading(false);
     }
-  }, [isOnline, driveApi]);
+  }, [isOnline, driveApi, folderIds]);
 
   // Update session cache with latest AI settings
   const updateSessionCache = async (settings) => {
@@ -87,8 +92,8 @@ export const useAISettings = () => {
 
   // Save AI settings to Google Drive
   const saveAISettings = useCallback(async (newSettings) => {
-    if (!isOnline || !driveApi) {
-      throw new Error('You must be online to save AI settings');
+    if (!isOnline || !driveApi || !folderIds?.root) {
+      throw new Error('You must be online and Google Drive must be initialized to save AI settings');
     }
 
     try {
@@ -97,7 +102,7 @@ export const useAISettings = () => {
       const file = new File([settingsContent], AI_SETTINGS_FILE_NAME, { type: 'application/json' });
       
       // For simplicity, always upload a new file (could be optimized to update existing)
-      await driveApi.uploadFile(file, null);
+      await driveApi.uploadFile(file, folderIds.root);
       
       // Update local state
       setAiSettings(newSettings);
@@ -112,7 +117,7 @@ export const useAISettings = () => {
       setError('Failed to save AI settings');
       throw err;
     }
-  }, [isOnline, driveApi]);
+  }, [isOnline, driveApi, folderIds]);
 
   // Toggle AI features
   const toggleAiFeatures = useCallback(async (enabled) => {

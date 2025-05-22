@@ -1,15 +1,24 @@
 import React, { useEffect, useRef } from 'react'
 import { Button } from '../../components/ui/button';
-import { ArrowLeft, Clock, Loader2, Save } from 'lucide-react';
+import { ArrowLeft, Clock, Loader2, Save, Camera } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../../components/ui/tooltip';
 import { Input } from '../../components/ui/input';
 import { formatDistanceToNow } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { Textarea } from '../../components/ui/textarea';
 
-export const NoteEditorHeader = ({ note, onNoteChange, isSaving, hasChanges, lastSaved, onSave, titleInputRef }) => {
+export const NoteEditorHeader = ({ note, onNoteChange, isSaving, hasChanges, lastSaved, onSave, titleInputRef, onImportImage, isImportingImage }) => {
     const navigate = useNavigate();
     const textAreaRef = useRef(null);
+    const inputRef = useRef(null);
+
+    const handleFileChange = (e) => {
+        const file = e.target.files?.[0];
+        if (file && onImportImage) {
+            onImportImage(file);
+        }
+        e.target.value = '';
+    };
 
     // Auto-resize the textarea based on content
     const adjustTextareaHeight = () => {
@@ -93,6 +102,32 @@ export const NoteEditorHeader = ({ note, onNoteChange, isSaving, hasChanges, las
                             )}
                         </div>
                         <div className="flex items-center gap-2">
+                            {/* Hidden file input for image import */}
+                            <input
+                                ref={inputRef}
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={handleFileChange}
+                            />
+                            {/* Button to trigger image import */}
+                            <TooltipProvider>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={() => inputRef.current && inputRef.current.click()}
+                                            disabled={isImportingImage}
+                                        >
+                                            <Camera className="h-4 w-4" />
+                                        </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                        <p>Import note from image</p>
+                                    </TooltipContent>
+                                </Tooltip>
+                            </TooltipProvider>
                             <TooltipProvider>
                                 <Tooltip>
                                     <TooltipTrigger asChild>

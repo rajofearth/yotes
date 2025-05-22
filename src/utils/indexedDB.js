@@ -88,15 +88,21 @@ export const clearSyncItem = (id) => performTransaction(SYNC_STORE, 'readwrite',
 
 export const clearDB = async () => {
     try {
-        const db = await openDB(); const stores = Array.from(db.objectStoreNames);
-        await performTransaction(stores, 'readwrite', (store, resolve, reject, transaction) => {
-             Promise.all(stores.map(name => new Promise((res, rej) => {
-                 const req = transaction.objectStore(name).clear();
-                 req.onsuccess = res; req.onerror = rej;
-             }))).then(resolve).catch(reject);
+        const db = await openDB();
+        const stores = Array.from(db.objectStoreNames);
+        const tx = db.transaction(stores, 'readwrite');
+        for (const name of stores) {
+            tx.objectStore(name).clear();
+        }
+        await new Promise((resolve, reject) => {
+            tx.oncomplete = resolve;
+            tx.onerror = () => reject(tx.error);
+            tx.onabort = () => reject(tx.error);
         });
         sessionStorage.clear();
-    } catch (err) { console.error("Error clearing DB:", err) }
+    } catch (err) {
+        console.error("Error clearing DB:", err);
+    }
 };
 
 export const deleteDB = async () => {
