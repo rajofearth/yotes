@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
-import { Plus, Search, FileText, LogOut, Upload, Settings, User as UserIcon, ImageIcon } from 'lucide-react'; // Added UserIcon and ImageIcon
+import { Plus, Search, FileText, LogOut, Upload, Settings, User as UserIcon, ImageIcon } from 'lucide-react';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -16,6 +16,9 @@ import { useOnlineStatus } from '../../contexts/OnlineStatusContext';
 import { useSettings } from '../../hooks/useSettings';
 import { useAISettings } from '../../hooks/useAISettings'; // Import useAISettings
 import { ImageUploadModal } from '../image/ImageUploadModal';
+import { useToast } from '../../contexts/ToastContext';
+import { TextShimmer } from '../ui/text-shimmer';
+import { Badge } from '../ui/badge';
 
 export default function NavBar({ onSearch }) {
   const navigate = useNavigate();
@@ -25,6 +28,7 @@ export default function NavBar({ onSearch }) {
   const { handleLogout } = useSettings();
   const { aiSettings, loading: isLoadingAISettings } = useAISettings();
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
+  const showToast = useToast();
 
   useEffect(() => {
     let isMounted = true;
@@ -116,25 +120,43 @@ export default function NavBar({ onSearch }) {
                   </DropdownMenuItem>
                   <DropdownMenuSeparator className="bg-overlay/10" />
                   <DropdownMenuItem
-                    className={`flex items-center gap-2 text-text-primary hover:bg-overlay/10 cursor-pointer ${
-                      (isLoadingAISettings || !aiSettings?.enabled || !aiSettings?.apiKey) ? 'opacity-50 cursor-not-allowed' : ''
+                    className={`flex items-center gap-2 rounded-sm transition-colors cursor-pointer ${
+                      !isLoadingAISettings && aiSettings?.enabled && aiSettings?.apiKey
+                        ? 'bg-primary/10 hover:bg-primary/20 hover:bg-overlay/10'
+                        : 'hover:bg-overlay/10'
                     }`}
                     onClick={() => {
-                      if (!isLoadingAISettings && aiSettings?.enabled && aiSettings?.apiKey) {
-                        setIsImageModalOpen(true);
+                      if (isLoadingAISettings) {
+                        showToast('AI settings are still loading, please wait.', 'info');
+                        return;
                       }
+                      if (!aiSettings?.enabled) {
+                        showToast('AI features are disabled in settings.', 'error');
+                        return;
+                      }
+                      if (!aiSettings?.apiKey) {
+                        showToast('AI API key is not configured in settings.', 'error');
+                        return;
+                      }
+                      setIsImageModalOpen(true);
                     }}
-                    disabled={isLoadingAISettings || !aiSettings?.enabled || !aiSettings?.apiKey}
                     title={
-                      isLoadingAISettings ? "Loading AI settings..." :
+                      isLoadingAISettings ? "AI settings are still loading, please wait." :
                       !aiSettings?.enabled ? "AI features are disabled in settings." :
                       !aiSettings?.apiKey ? "AI API key is not configured in settings." :
                       "Create a new note from an image"
                     }
                   >
-                    <ImageIcon className="h-4 w-4" />
+                    <ImageIcon className="h-4 w-4 text-icon-primary" />
                     <div className="flex flex-col">
-                      <span className="text-sm">Image Note</span>
+                      {isLoadingAISettings ? (
+                        <TextShimmer className="text-sm font-semibold">Image Note</TextShimmer>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-semibold">Image Note</span>
+                          <Badge variant="outline" className="border-primary text-primary hover:bg-primary/20 hover:bg-overlay/10 text-xs">AI</Badge>
+                        </div>
+                      )}
                       <span className="text-xs text-text-primary/60">Create with image</span>
                     </div>
                   </DropdownMenuItem>

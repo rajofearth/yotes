@@ -7,6 +7,7 @@ import { NoteEditorHeader } from '../../components/note/NoteEditorHeader';
 import { TagManagementDialog } from '../../components/settings/TagManagementDialog';
 import { Loader2 } from 'lucide-react';
 import { generateNoteFromImage } from '../../utils/aiImageService';
+import { Skeleton } from '../../components/ui/skeleton';
 
 export default function NoteEditor() {
   const { id: noteId } = useParams(); // Get note ID from params (if editing)
@@ -240,6 +241,64 @@ export default function NoteEditor() {
       }
     }
   };
+
+  // SKELETON: Show while importing from image
+  if (isImportingImage) {
+    return (
+      <div className="min-h-screen bg-bg-primary flex flex-col">
+        {/* Header skeleton */}
+        <header className="border-b border-overlay/10 bg-bg-primary/95 backdrop-blur-sm sticky top-0 z-10 shadow-sm">
+          <div className="max-w-[1400px] mx-auto px-3 sm:px-6 py-3 sm:py-5">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-8">
+              {/* Left section: Back button and title */}
+              <div className="flex items-start gap-2 w-full sm:max-w-[70%]">
+                <Skeleton className="h-9 w-9 rounded-md" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+              {/* Right section: action buttons */}
+              <div className="flex items-center gap-2 mt-3 sm:mt-0">
+                <Skeleton className="h-8 w-8 rounded-md" />
+                <Skeleton className="h-8 w-16 rounded-md" />
+                <Skeleton className="h-8 w-20 rounded-md" />
+              </div>
+            </div>
+          </div>
+        </header>
+        {/* Main skeleton */}
+        <main className="flex-1 max-w-[1920px] mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6 sm:space-y-8 w-full">
+          <div className="space-y-4 max-w-4xl mx-auto">
+            {/* Description skeleton with floating label */}
+            <div className="relative">
+              <Skeleton className="h-[60px] w-full mb-1" />
+              <div className="absolute right-3 top-3 text-xs text-text-primary/30 pointer-events-none">
+                <Skeleton className="h-4 w-20" />
+              </div>
+            </div>
+            {/* Tag pills skeleton */}
+            <div className="flex gap-2 mb-2">
+              <Skeleton className="h-6 w-16 rounded-full" />
+              <Skeleton className="h-6 w-12 rounded-full" />
+              <Skeleton className="h-6 w-20 rounded-full" />
+            </div>
+            {/* Content skeleton in bordered container with floating char count */}
+            <div className="relative max-w-4xl mx-auto border border-overlay/10 rounded-md shadow-sm">
+              <div className="space-y-2 p-5 sm:p-6">
+                <Skeleton className="h-5 w-full" />
+                <Skeleton className="h-5 w-11/12" />
+                <Skeleton className="h-5 w-10/12" />
+                <Skeleton className="h-5 w-9/12" />
+                <Skeleton className="h-5 w-8/12" />
+                <Skeleton className="h-5 w-7/12" />
+              </div>
+              <div className="absolute right-3 bottom-3">
+                <Skeleton className="h-6 w-20 rounded-md" />
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   if (noteId && isNotesLoading) {
     return (

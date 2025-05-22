@@ -47,9 +47,12 @@ Respond with ONLY a valid JSON object with these exact keys: "title", "descripti
 
   // Make API request
   try {
-    const response = await fetch(`${endpoint}?key=${aiSettings.apiKey}`, {
+    const response = await fetch(`${endpoint}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'x-goog-api-key': aiSettings.apiKey
+      },
       body: JSON.stringify(payload),
     });
 

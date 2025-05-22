@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDropzone } from 'react-dropzone';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -49,6 +49,18 @@ export const ImageUploadModal = ({ isOpen, onClose }) => {
     setPreview(null);
     onClose();
   };
+
+  // Close modal on Escape key
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        handleCancel();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isOpen, handleCancel]);
 
   // Modal overlay animation
   const overlayVariants = {
@@ -109,35 +121,34 @@ export const ImageUploadModal = ({ isOpen, onClose }) => {
             {!file ? (
               <div 
                 {...getRootProps()} 
-                className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
-                  isDragActive ? 'border-primary bg-primary/5' : 'border-overlay/20 hover:border-primary/50'
+                className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors bg-bg-primary/80 shadow-lg hover:shadow-xl focus:ring-2 focus:ring-primary/30 focus:outline-none ${
+                  isDragActive ? 'border-primary bg-primary/10' : 'border-overlay/20 hover:border-primary/50'
                 }`}
               >
                 <input {...getInputProps()} />
-                <Upload className="h-10 w-10 mx-auto text-text-primary/60 mb-2" />
-                <p className="text-sm text-text-primary/80">
+                <Upload className="h-12 w-12 mx-auto text-primary mb-3" />
+                <p className="text-base font-medium text-text-primary">
                   {isDragActive
                     ? "Drop the image here..."
-                    : "Drag & drop an image here, or click to select"
+                    : "Drag & drop an image, or click to select"
                   }
                 </p>
-                <p className="text-xs text-text-primary/50 mt-1">
-                  Supported formats: JPEG, PNG, WebP
+                <p className="text-xs text-text-primary/50 mt-2">
+                  Supported: JPEG, PNG, WebP
                 </p>
               </div>
             ) : (
-              <div className="space-y-4">
-                <div className="relative rounded-lg overflow-hidden">
+              <div className="space-y-6">
+                <div className="relative rounded-xl overflow-hidden border border-overlay/20 shadow-md">
                   <img 
                     src={preview} 
                     alt="Preview" 
-                    className="w-full h-48 object-cover"
+                    className="w-full h-56 object-cover bg-bg-primary"
                   />
                 </div>
-                
-                <div className="flex justify-end space-x-2">
+                <div className="flex justify-end gap-2">
                   <Button 
-                    variant="ghost" 
+                    variant="outline" 
                     onClick={() => {
                       setFile(null);
                       setPreview(null);
@@ -146,17 +157,16 @@ export const ImageUploadModal = ({ isOpen, onClose }) => {
                     Change Image
                   </Button>
                   <Button 
+                    variant="default"
                     onClick={handleProcessImage}
-                    className={`bg-primary hover:bg-primary/90`}
                   >
                     Create Note from Image
                   </Button>
                 </div>
               </div>
             )}
-            
-            <div className="mt-4 text-xs text-text-primary/50">
-              <p>Image will be analyzed by AI to extract title, description, tags, and content for your note.</p>
+            <div className="mt-6 text-xs text-text-primary/60 text-center">
+              <p>Image will be analyzed by AI to extract title, description, and content for your note.</p>
             </div>
           </div>
         </motion.div>

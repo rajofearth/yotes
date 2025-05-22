@@ -88,10 +88,12 @@ Respond with ONLY the JSON object and no additional text.`
     const endpoint = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
     
     // Make request to Google Gemini API
-    const response = await fetch(`${endpoint}?key=${apiKey}`, {
+    const response = await fetch(endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        // API key sent in header to avoid placing it in URL parameters per security best practices [Gemini API docs - API key best practices](https://ai.google.dev/gemini-api/docs/api-key)
+        'x-goog-api-key': apiKey
       },
       body: JSON.stringify(prompt),
     });
@@ -132,4 +134,4 @@ Respond with ONLY the JSON object and no additional text.`
   }
 };
 
-export { getAISettings }; 
+export { getAISettings };
