@@ -199,7 +199,19 @@ export class GoogleDriveAPI {
             });
 
             if (!response.ok) {
-                throw new Error(`Failed to refresh token: ${response.statusText}`);
+                // Attempt to parse error details
+                let errorMsg = response.statusText;
+                try {
+                    const errorData = await response.json();
+                    if (errorData.error_description) {
+                        errorMsg = errorData.error_description;
+                    } else if (errorData.error) {
+                        errorMsg = errorData.error;
+                    }
+                } catch (_) {
+                    // ignore JSON parse errors
+                }
+                throw new Error(`Failed to refresh token: ${errorMsg}`);
             }
 
             const data = await response.json();
@@ -212,6 +224,7 @@ export class GoogleDriveAPI {
                 console.error('Failed to refresh token due to network issues:', error);
                 throw new Error('Cannot refresh token while offline');
             }
+            // Re-throw error for context to handle
             throw error;
         }
     }

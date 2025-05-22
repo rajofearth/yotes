@@ -121,11 +121,15 @@ export default function NavBar({ onSearch }) {
                   <DropdownMenuSeparator className="bg-overlay/10" />
                   <DropdownMenuItem
                     className={`flex items-center gap-2 rounded-sm transition-colors cursor-pointer ${
-                      !isLoadingAISettings && aiSettings?.enabled && aiSettings?.apiKey
+                      !isLoadingAISettings && aiSettings?.enabled && aiSettings?.apiKey && isOnline
                         ? 'bg-primary/10 hover:bg-primary/20 hover:bg-overlay/10'
-                        : 'hover:bg-overlay/10'
+                        : 'opacity-50 text-text-primary/40 cursor-not-allowed hover:bg-overlay/10'
                     }`}
                     onClick={() => {
+                      if (!isOnline) {
+                        showToast('Image note creation is disabled while offline.', 'error');
+                        return;
+                      }
                       if (isLoadingAISettings) {
                         showToast('AI settings are still loading, please wait.', 'info');
                         return;
@@ -141,11 +145,13 @@ export default function NavBar({ onSearch }) {
                       setIsImageModalOpen(true);
                     }}
                     title={
+                      !isOnline ? "Image note creation is disabled while offline." :
                       isLoadingAISettings ? "AI settings are still loading, please wait." :
                       !aiSettings?.enabled ? "AI features are disabled in settings." :
                       !aiSettings?.apiKey ? "AI API key is not configured in settings." :
                       "Create a new note from an image"
                     }
+                    disabled={!isOnline}
                   >
                     <ImageIcon className="h-4 w-4 text-icon-primary" />
                     <div className="flex flex-col">
