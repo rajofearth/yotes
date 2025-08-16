@@ -18,6 +18,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import ProgressBar from './components/ProgressBar';
 import PWAReloadPrompt from './components/PWAReloadPrompt';
 import SyncButton from './components/SyncButton';
+import AutoBackupWatcher from './components/AutoBackupWatcher.jsx';
 
 function AppContent({ session, isAuthLoading, isInitialLoad, setIsInitialLoad }) {
   const isOnline = useOnlineStatus();
@@ -168,6 +169,7 @@ function AppContent({ session, isAuthLoading, isInitialLoad, setIsInitialLoad })
       <Suspense
         fallback={<ProgressBar progress={-1} message="Loading page..." />}
       >
+        <AutoBackupWatcher session={session} />
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/note/edit/:id" element={<NoteEditor />} />

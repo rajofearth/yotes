@@ -13,6 +13,7 @@ import { NoteActivityCard } from '../components/settings/NoteActivityCard';
 import { DonationCard } from '../components/settings/DonationCard';
 import { AccountActionsCard } from '../components/settings/AccountActionsCard';
 import { AIFeaturesCard } from '../components/settings/AIFeaturesCard';
+import BackupCard from '../components/settings/BackupCard.jsx';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Settings as SettingsIcon, User, Tag, BarChart, Heart, Shield, Brain } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../components/ui/dialog';
@@ -172,6 +173,7 @@ export default function Settings() {
                                         <AccountDetailsCard user={user} />
                                         <NoteActivityCard notes={notes} noteActivity={noteActivity} />
                                     </div>
+                                    <div className="max-w-2xl"><BackupCard user={user} /></div>
                                 </div>
                             )}
                             {activeTab === 'tags' && (

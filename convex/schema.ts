@@ -73,6 +73,22 @@ export default defineSchema({
   })
     .index("byUserCacheKey", ["userId", "cacheKey"]) 
     .index("byExpiresAt", ["expiresAt"]),
+
+  backups: defineTable({
+    userId: v.id("users"),
+    kind: v.union(v.literal("manual"), v.literal("auto")),
+    status: v.union(v.literal("pending"), v.literal("success"), v.literal("error")),
+    startedAt: v.number(),
+    finishedAt: v.optional(v.number()),
+    bytes: v.optional(v.number()),
+    driveFileId: v.optional(v.string()),
+    driveWebViewLink: v.optional(v.string()),
+    error: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("byUserStartedAt", ["userId", "startedAt"]) 
+    .index("byUserFinishedAt", ["userId", "finishedAt"]),
 });
 
 
