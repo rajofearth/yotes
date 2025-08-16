@@ -21,14 +21,16 @@ export function NotesProvider({ children, session }) {
     const [convexUserId, setConvexUserId] = useState(null);
     const dekRef = useRef(null); // CryptoKey for data encryption
     const e2eeReadyRef = useRef(false);
+    const [isE2EEReady, setIsE2EEReady] = useState(false);
     
     // Passphrase modal state
     const [showPassphraseModal, setShowPassphraseModal] = useState(false);
     const [isFirstTimeSetup, setIsFirstTimeSetup] = useState(false);
     const [passphraseCallback, setPassphraseCallback] = useState(null);
     
-    const listNotes = useQuery(api.notes.list, convexUserId ? { userId: convexUserId } : 'skip');
-    const listTags = useQuery(api.tags.list, convexUserId ? { userId: convexUserId } : 'skip');
+    // Only fetch after E2EE is ready
+    const listNotes = useQuery(api.notes.list, convexUserId && isE2EEReady ? { userId: convexUserId } : 'skip');
+    const listTags = useQuery(api.tags.list, convexUserId && isE2EEReady ? { userId: convexUserId } : 'skip');
     const createNoteMutation = useMutation(api.notes.create);
     const updateNoteMutation = useMutation(api.notes.update);
     const deleteNoteMutation = useMutation(api.notes.remove);
@@ -36,9 +38,7 @@ export function NotesProvider({ children, session }) {
     const updateTagMutation = useMutation(api.tags.update);
     const deleteTagMutation = useMutation(api.tags.remove);
 
-    // No deduplication needed with Convex as source of truth
-
-    // Remove IndexedDB/Drive: live Convex data subscription
+    // Live Convex data subscription, gated by E2EE readiness
     useEffect(() => {
             if (!session) {
                 setIsLoading(false);
@@ -48,7 +48,6 @@ export function NotesProvider({ children, session }) {
             try {
                 setLoadingState({ progress: 40, message: 'Connecting to Convex...' });
                 
-                // Ensure user exists; also pass through any existing E2EE fields unchanged
                 const id = await ensureUser({
                     externalId: session.user.id,
                     email: session.user.email ?? 'unknown@example.com',
@@ -61,19 +60,17 @@ export function NotesProvider({ children, session }) {
                 // Fetch user doc to read E2EE metadata
                 const userDoc = await convex.query(api.users.byExternalId, { externalId: session.user.id });
                 
-                // Check if we have a stored passphrase
                 const storedPassphrase = sessionStorage.getItem('yotes_passphrase');
                 
                 if (userDoc?.wrappedDekB64 && userDoc?.wrappedDekIvB64 && userDoc?.encSaltB64 && userDoc?.encIterations) {
-                    // User has E2EE setup - need passphrase to unlock
                     if (storedPassphrase) {
                         try {
                             const kek = await deriveKekFromPassphrase(storedPassphrase, userDoc.encSaltB64, userDoc.encIterations);
                             const dek = await unwrapDek(userDoc.wrappedDekB64, userDoc.wrappedDekIvB64, kek);
                             dekRef.current = dek; 
                             e2eeReadyRef.current = true;
-                        } catch (err) {
-                            // Stored passphrase is wrong - clear it and show modal
+                            setIsE2EEReady(true);
+                        } catch {
                             sessionStorage.removeItem('yotes_passphrase');
                             setShowPassphraseModal(true);
                             setIsFirstTimeSetup(false);
@@ -82,13 +79,13 @@ export function NotesProvider({ children, session }) {
                                 const dek = await unwrapDek(userDoc.wrappedDekB64, userDoc.wrappedDekIvB64, kek);
                                 dekRef.current = dek; 
                                 e2eeReadyRef.current = true;
+                                setIsE2EEReady(true);
                                 sessionStorage.setItem('yotes_passphrase', passphrase);
                                 setShowPassphraseModal(false);
                             });
                             return;
                         }
                     } else {
-                        // No stored passphrase - show unlock modal
                         setShowPassphraseModal(true);
                         setIsFirstTimeSetup(false);
                         setPassphraseCallback(() => async (passphrase) => {
@@ -96,13 +93,14 @@ export function NotesProvider({ children, session }) {
                             const dek = await unwrapDek(userDoc.wrappedDekB64, userDoc.wrappedDekIvB64, kek);
                             dekRef.current = dek; 
                             e2eeReadyRef.current = true;
+                            setIsE2EEReady(true);
                             sessionStorage.setItem('yotes_passphrase', passphrase);
                             setShowPassphraseModal(false);
                         });
                         return;
                     }
                 } else {
-                    // First-time setup: need to create E2EE setup
+                    // First-time setup
                     setShowPassphraseModal(true);
                     setIsFirstTimeSetup(true);
                     setPassphraseCallback(() => async (passphrase) => {
@@ -113,9 +111,9 @@ export function NotesProvider({ children, session }) {
                         const { wrappedDekB64, wrappedIvB64 } = await wrapDek(dek, kek);
                         dekRef.current = dek; 
                         e2eeReadyRef.current = true;
+                        setIsE2EEReady(true);
                         sessionStorage.setItem('yotes_passphrase', passphrase);
                         
-                        // Store e2ee metadata on user
                         await ensureUser({
                             externalId: session.user.id,
                             email: session.user.email ?? 'unknown@example.com',
@@ -140,9 +138,9 @@ export function NotesProvider({ children, session }) {
         })();
     }, [session, ensureUser, convex]);
 
-    // Subscribe to Convex data and normalize to frontend shape
+    // Subscribe to Convex data and normalize to frontend shape (only after E2EE ready)
     useEffect(() => {
-        if (!session) return;
+        if (!session || !isE2EEReady) return;
 
         if (Array.isArray(listTags)) {
             const normalizedTags = listTags.map((t) => ({
@@ -180,7 +178,7 @@ export function NotesProvider({ children, session }) {
             setIsLoading(false);
             setLoadingState({ progress: 100, message: 'Data loaded' });
         }
-    }, [session, listNotes, listTags]);
+    }, [session, isE2EEReady, listNotes, listTags]);
 
     const createNote = useCallback(async (noteData) => {
         if (!session?.user?.id) throw new Error('Not authenticated');
@@ -204,7 +202,6 @@ export function NotesProvider({ children, session }) {
             payload.content = noteData.content ?? undefined;
         }
         const created = await createNoteMutation(payload);
-        // Normalize return for callers expecting id
         return {
             ...created,
             id: created?._id,
@@ -272,13 +269,17 @@ export function NotesProvider({ children, session }) {
 
     const handlePassphraseCancel = () => {
         setShowPassphraseModal(false);
-        // Could redirect to login or show error
     };
 
     const lockNotes = useCallback(() => {
+        // Clear key material and any decrypted data in memory/UI
         dekRef.current = null;
         e2eeReadyRef.current = false;
+        setIsE2EEReady(false);
+        setNotes([]);
+        setTags([]);
         sessionStorage.removeItem('yotes_passphrase');
+        // Prompt to unlock again
         setShowPassphraseModal(true);
         setIsFirstTimeSetup(false);
         setPassphraseCallback(() => async (passphrase) => {
@@ -286,8 +287,9 @@ export function NotesProvider({ children, session }) {
             if (userDoc?.wrappedDekB64 && userDoc?.wrappedDekIvB64 && userDoc?.encSaltB64 && userDoc?.encIterations) {
                 const kek = await deriveKekFromPassphrase(passphrase, userDoc.encSaltB64, userDoc.encIterations);
                 const dek = await unwrapDek(userDoc.wrappedDekB64, userDoc.wrappedDekIvB64, kek);
-                dekRef.current = dek; 
+                dekRef.current = dek;
                 e2eeReadyRef.current = true;
+                setIsE2EEReady(true);
                 sessionStorage.setItem('yotes_passphrase', passphrase);
                 setShowPassphraseModal(false);
             } else {
@@ -322,11 +324,12 @@ export function NotesProvider({ children, session }) {
             syncDiscrepancyDetected: false,
             checkSyncDiscrepancies: async () => false,
             // E2EE functions
-            isE2EEReady: e2eeReadyRef.current,
+            isE2EEReady,
             lockNotes,
         }}>
-            {children}
-            
+            {/* Render app content only after E2EE is ready to avoid any leakage */}
+            {isE2EEReady ? children : null}
+
             {/* Passphrase Modal */}
             <PassphraseModal
                 isOpen={showPassphraseModal}
