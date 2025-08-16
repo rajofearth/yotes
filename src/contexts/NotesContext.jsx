@@ -3,6 +3,7 @@ import { useOnlineStatus } from './OnlineStatusContext';
 import { useConvex, useQuery, useMutation } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { deriveKekFromPassphrase, unwrapDek, generateDek, wrapDek, encryptString, decryptString, generateSaltB64 } from '../lib/e2ee';
+import { PassphraseModal } from '../components/PassphraseModal';
 
 export const NotesContext = createContext();
 
@@ -20,6 +21,12 @@ export function NotesProvider({ children, session }) {
     const [convexUserId, setConvexUserId] = useState(null);
     const dekRef = useRef(null); // CryptoKey for data encryption
     const e2eeReadyRef = useRef(false);
+    
+    // Passphrase modal state
+    const [showPassphraseModal, setShowPassphraseModal] = useState(false);
+    const [isFirstTimeSetup, setIsFirstTimeSetup] = useState(false);
+    const [passphraseCallback, setPassphraseCallback] = useState(null);
+    
     const listNotes = useQuery(api.notes.list, convexUserId ? { userId: convexUserId } : 'skip');
     const listTags = useQuery(api.tags.list, convexUserId ? { userId: convexUserId } : 'skip');
     const createNoteMutation = useMutation(api.notes.create);
@@ -40,14 +47,7 @@ export function NotesProvider({ children, session }) {
         (async () => {
             try {
                 setLoadingState({ progress: 40, message: 'Connecting to Convex...' });
-                // E2EE bootstrap: we rely on a locally provided passphrase per session
-                let passphrase = sessionStorage.getItem('yotes_passphrase');
-                if (!passphrase) {
-                    passphrase = prompt('Set or enter your encryption passphrase (keep it safe).');
-                    if (!passphrase) throw new Error('Encryption passphrase required');
-                    sessionStorage.setItem('yotes_passphrase', passphrase);
-                }
-
+                
                 // Ensure user exists; also pass through any existing E2EE fields unchanged
                 const id = await ensureUser({
                     externalId: session.user.id,
@@ -60,29 +60,75 @@ export function NotesProvider({ children, session }) {
 
                 // Fetch user doc to read E2EE metadata
                 const userDoc = await convex.query(api.users.byExternalId, { externalId: session.user.id });
+                
+                // Check if we have a stored passphrase
+                const storedPassphrase = sessionStorage.getItem('yotes_passphrase');
+                
                 if (userDoc?.wrappedDekB64 && userDoc?.wrappedDekIvB64 && userDoc?.encSaltB64 && userDoc?.encIterations) {
-                    const kek = await deriveKekFromPassphrase(passphrase, userDoc.encSaltB64, userDoc.encIterations);
-                    const dek = await unwrapDek(userDoc.wrappedDekB64, userDoc.wrappedDekIvB64, kek);
-                    dekRef.current = dek; e2eeReadyRef.current = true;
+                    // User has E2EE setup - need passphrase to unlock
+                    if (storedPassphrase) {
+                        try {
+                            const kek = await deriveKekFromPassphrase(storedPassphrase, userDoc.encSaltB64, userDoc.encIterations);
+                            const dek = await unwrapDek(userDoc.wrappedDekB64, userDoc.wrappedDekIvB64, kek);
+                            dekRef.current = dek; 
+                            e2eeReadyRef.current = true;
+                        } catch (err) {
+                            // Stored passphrase is wrong - clear it and show modal
+                            sessionStorage.removeItem('yotes_passphrase');
+                            setShowPassphraseModal(true);
+                            setIsFirstTimeSetup(false);
+                            setPassphraseCallback(() => async (passphrase) => {
+                                const kek = await deriveKekFromPassphrase(passphrase, userDoc.encSaltB64, userDoc.encIterations);
+                                const dek = await unwrapDek(userDoc.wrappedDekB64, userDoc.wrappedDekIvB64, kek);
+                                dekRef.current = dek; 
+                                e2eeReadyRef.current = true;
+                                sessionStorage.setItem('yotes_passphrase', passphrase);
+                                setShowPassphraseModal(false);
+                            });
+                            return;
+                        }
+                    } else {
+                        // No stored passphrase - show unlock modal
+                        setShowPassphraseModal(true);
+                        setIsFirstTimeSetup(false);
+                        setPassphraseCallback(() => async (passphrase) => {
+                            const kek = await deriveKekFromPassphrase(passphrase, userDoc.encSaltB64, userDoc.encIterations);
+                            const dek = await unwrapDek(userDoc.wrappedDekB64, userDoc.wrappedDekIvB64, kek);
+                            dekRef.current = dek; 
+                            e2eeReadyRef.current = true;
+                            sessionStorage.setItem('yotes_passphrase', passphrase);
+                            setShowPassphraseModal(false);
+                        });
+                        return;
+                    }
                 } else {
-                    // First-time setup: create salt, derive KEK, generate DEK and wrap
-                    const saltB64 = generateSaltB64();
-                    const iterations = 310000;
-                    const kek = await deriveKekFromPassphrase(passphrase, saltB64, iterations);
-                    const dek = await generateDek();
-                    const { wrappedDekB64, wrappedIvB64 } = await wrapDek(dek, kek);
-                    dekRef.current = dek; e2eeReadyRef.current = true;
-                    // Store e2ee metadata on user
-                    await ensureUser({
-                        externalId: session.user.id,
-                        email: session.user.email ?? 'unknown@example.com',
-                        displayName: session.user.user_metadata?.full_name ?? undefined,
-                        avatarUrl: session.user.user_metadata?.avatar_url ?? undefined,
-                        encSaltB64: saltB64,
-                        encIterations: iterations,
-                        wrappedDekB64,
-                        wrappedDekIvB64: wrappedIvB64,
+                    // First-time setup: need to create E2EE setup
+                    setShowPassphraseModal(true);
+                    setIsFirstTimeSetup(true);
+                    setPassphraseCallback(() => async (passphrase) => {
+                        const saltB64 = generateSaltB64();
+                        const iterations = 310000;
+                        const kek = await deriveKekFromPassphrase(passphrase, saltB64, iterations);
+                        const dek = await generateDek();
+                        const { wrappedDekB64, wrappedIvB64 } = await wrapDek(dek, kek);
+                        dekRef.current = dek; 
+                        e2eeReadyRef.current = true;
+                        sessionStorage.setItem('yotes_passphrase', passphrase);
+                        
+                        // Store e2ee metadata on user
+                        await ensureUser({
+                            externalId: session.user.id,
+                            email: session.user.email ?? 'unknown@example.com',
+                            displayName: session.user.user_metadata?.full_name ?? undefined,
+                            avatarUrl: session.user.user_metadata?.avatar_url ?? undefined,
+                            encSaltB64: saltB64,
+                            encIterations: iterations,
+                            wrappedDekB64,
+                            wrappedDekIvB64: wrappedIvB64,
+                        });
+                        setShowPassphraseModal(false);
                     });
+                    return;
                 }
 
                 setLoadingState({ progress: 80, message: 'Loading data...' });
@@ -218,6 +264,38 @@ export function NotesProvider({ children, session }) {
 
     const refreshFromIndexedDB = useCallback(async () => {}, []);
 
+    const handlePassphraseConfirm = async (passphrase) => {
+        if (passphraseCallback) {
+            await passphraseCallback(passphrase);
+        }
+    };
+
+    const handlePassphraseCancel = () => {
+        setShowPassphraseModal(false);
+        // Could redirect to login or show error
+    };
+
+    const lockNotes = useCallback(() => {
+        dekRef.current = null;
+        e2eeReadyRef.current = false;
+        sessionStorage.removeItem('yotes_passphrase');
+        setShowPassphraseModal(true);
+        setIsFirstTimeSetup(false);
+        setPassphraseCallback(() => async (passphrase) => {
+            const userDoc = await convex.query(api.users.byExternalId, { externalId: session.user.id });
+            if (userDoc?.wrappedDekB64 && userDoc?.wrappedDekIvB64 && userDoc?.encSaltB64 && userDoc?.encIterations) {
+                const kek = await deriveKekFromPassphrase(passphrase, userDoc.encSaltB64, userDoc.encIterations);
+                const dek = await unwrapDek(userDoc.wrappedDekB64, userDoc.wrappedDekIvB64, kek);
+                dekRef.current = dek; 
+                e2eeReadyRef.current = true;
+                sessionStorage.setItem('yotes_passphrase', passphrase);
+                setShowPassphraseModal(false);
+            } else {
+                throw new Error('No encryption setup found');
+            }
+        });
+    }, [convex, session]);
+
     return (
         <NotesContext.Provider value={{
             notes,
@@ -243,8 +321,19 @@ export function NotesProvider({ children, session }) {
             syncProgressMessage: '',
             syncDiscrepancyDetected: false,
             checkSyncDiscrepancies: async () => false,
+            // E2EE functions
+            isE2EEReady: e2eeReadyRef.current,
+            lockNotes,
         }}>
             {children}
+            
+            {/* Passphrase Modal */}
+            <PassphraseModal
+                isOpen={showPassphraseModal}
+                onConfirm={handlePassphraseConfirm}
+                isFirstTime={isFirstTimeSetup}
+                onCancel={handlePassphraseCancel}
+            />
         </NotesContext.Provider>
     );
 }

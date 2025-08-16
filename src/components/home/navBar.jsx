@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
-import { Plus, Search, FileText, LogOut, Upload, Settings, User as UserIcon, ImageIcon } from 'lucide-react';
+import { Plus, Search, FileText, LogOut, Upload, Settings, User as UserIcon, ImageIcon, Lock, Unlock } from 'lucide-react';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -19,6 +19,7 @@ import { ImageUploadModal } from '../image/ImageUploadModal';
 import { useToast } from '../../contexts/ToastContext';
 import { TextShimmer } from '../ui/text-shimmer';
 import { Badge } from '../ui/badge';
+import { useNotes } from '../../hooks/useNotes';
 
 export default function NavBar({ onSearch }) {
   const navigate = useNavigate();
@@ -29,6 +30,7 @@ export default function NavBar({ onSearch }) {
   const { aiSettings, loading: isLoadingAISettings } = useAISettings();
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
   const showToast = useToast();
+  const { isE2EEReady, lockNotes } = useNotes();
 
   useEffect(() => {
     let isMounted = true;
@@ -75,6 +77,13 @@ export default function NavBar({ onSearch }) {
 
   const profilePicture = user?.user_metadata?.avatar_url; // No default here
 
+  const handleLockNotes = () => {
+    if (lockNotes) {
+      lockNotes();
+      showToast('Notes locked. Enter passphrase to unlock.', 'info');
+    }
+  };
+
   return (
     <>
       <nav className="sticky top-0 z-50 border-b border-overlay/10 bg-bg-primary/95 backdrop-blur">
@@ -93,6 +102,19 @@ export default function NavBar({ onSearch }) {
               </div>
             </div>
             <div className="flex items-center gap-2 sm:gap-4">
+              {/* Lock/Unlock Button */}
+              {isE2EEReady && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleLockNotes}
+                  className="h-10 w-10 rounded-full bg-overlay/5 hover:bg-overlay/10 transition-colors"
+                  title="Lock notes (clear encryption key from memory)"
+                >
+                  <Lock className="h-5 w-5 text-icon-primary" />
+                </Button>
+              )}
+              
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button 

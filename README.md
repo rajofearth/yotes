@@ -10,6 +10,8 @@ Yotes prioritizes user privacy and control by keeping data in a secure, real-tim
 
 - **Privacy-Focused Notes**: Create, edit, and delete notes stored securely in Convex with per-user access control.
 - **End-to-End Encryption (E2EE)**: Note fields are encrypted client-side (AES-GCM) with keys derived from a user passphrase (PBKDF2). Server only stores ciphertext and wrapping metadata.
+- **Secure Passphrase UI**: Beautiful modal for setting up and unlocking encryption with clear security information.
+- **Manual Lock/Unlock**: Lock button in navbar to clear encryption keys from memory for enhanced security.
 - **Real-time Sync**: Notes and tags update instantly across sessions via Convex live queries.
 - **Tagging System**: Categorize notes with customizable tags.
 - **Search & Filter**: Quickly find notes by content or tags.
@@ -90,11 +92,12 @@ From Yashraj’s rough TODO list, here’s what’s in the pipeline:
 
 1. **Sign In**: Log in with Google.
 2. **Encryption Passphrase**: On first run, you'll be prompted to set a passphrase. Keep it safe; it's required to decrypt your notes client-side.
-2. **Create Notes**: Use the "+" button in the navbar to add notes.
-3. **Organize**: Add tags or (soon) import files like PDFs.
-4. **Search & Filter**: Use the search bar or tag filters on the homepage.
-5. **Track Activity**: Check your note heatmap in Settings.
-6. **Manage Account**: Log out or delete your account from Settings.
+3. **Create Notes**: Use the "+" button in the navbar to add notes.
+4. **Lock Notes**: Use the lock button (🔒) in the navbar to manually lock your notes and clear encryption keys from memory.
+5. **Organize**: Add tags or (soon) import files like PDFs.
+6. **Search & Filter**: Use the search bar or tag filters on the homepage.
+7. **Track Activity**: Check your note heatmap in Settings.
+8. **Manage Account**: Log out or delete your account from Settings.
 
 ## Development
 
