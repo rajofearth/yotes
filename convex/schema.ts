@@ -8,6 +8,11 @@ export default defineSchema({
     email: v.string(),
     displayName: v.optional(v.string()),
     avatarUrl: v.optional(v.string()),
+    // E2EE config (no secrets stored) - optional to allow migration
+    encSaltB64: v.optional(v.string()), // base64 salt for PBKDF2
+    encIterations: v.optional(v.number()), // PBKDF2 iterations
+    wrappedDekB64: v.optional(v.string()), // base64-wrapped DEK with KEK
+    wrappedDekIvB64: v.optional(v.string()), // AES-GCM IV used to wrap DEK
     createdAt: v.number(), // Date.now() in ms
     updatedAt: v.number(), // Date.now() in ms
   })
@@ -27,9 +32,13 @@ export default defineSchema({
   notes: defineTable({
     userId: v.id("users"),
     // Title/description/content are optional to allow quick notes and empty fields during drafting
-    title: v.optional(v.string()),
-    description: v.optional(v.string()),
-    content: v.optional(v.string()),
+    title: v.optional(v.string()), // legacy plaintext (migration path)
+    description: v.optional(v.string()), // legacy plaintext
+    content: v.optional(v.string()), // legacy plaintext
+    // Encrypted variants (AES-GCM base64 fields)
+    titleEnc: v.optional(v.object({ ct: v.string(), iv: v.string() })),
+    descriptionEnc: v.optional(v.object({ ct: v.string(), iv: v.string() })),
+    contentEnc: v.optional(v.object({ ct: v.string(), iv: v.string() })),
     // Array of tag references
     tags: v.array(v.id("tags")),
     createdAt: v.number(),

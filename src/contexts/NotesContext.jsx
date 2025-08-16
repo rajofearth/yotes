@@ -1,7 +1,8 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { useOnlineStatus } from './OnlineStatusContext';
 import { useConvex, useQuery, useMutation } from 'convex/react';
 import { api } from '../../convex/_generated/api';
+import { deriveKekFromPassphrase, unwrapDek, generateDek, wrapDek, encryptString, decryptString, generateSaltB64 } from '../lib/e2ee';
 
 export const NotesContext = createContext();
 
@@ -17,6 +18,8 @@ export function NotesProvider({ children, session }) {
     const convex = useConvex();
     const ensureUser = useMutation(api.users.ensure);
     const [convexUserId, setConvexUserId] = useState(null);
+    const dekRef = useRef(null); // CryptoKey for data encryption
+    const e2eeReadyRef = useRef(false);
     const listNotes = useQuery(api.notes.list, convexUserId ? { userId: convexUserId } : 'skip');
     const listTags = useQuery(api.tags.list, convexUserId ? { userId: convexUserId } : 'skip');
     const createNoteMutation = useMutation(api.notes.create);
@@ -37,7 +40,15 @@ export function NotesProvider({ children, session }) {
         (async () => {
             try {
                 setLoadingState({ progress: 40, message: 'Connecting to Convex...' });
-                // Ensure user exists in Convex
+                // E2EE bootstrap: we rely on a locally provided passphrase per session
+                let passphrase = sessionStorage.getItem('yotes_passphrase');
+                if (!passphrase) {
+                    passphrase = prompt('Set or enter your encryption passphrase (keep it safe).');
+                    if (!passphrase) throw new Error('Encryption passphrase required');
+                    sessionStorage.setItem('yotes_passphrase', passphrase);
+                }
+
+                // Ensure user exists; also pass through any existing E2EE fields unchanged
                 const id = await ensureUser({
                     externalId: session.user.id,
                     email: session.user.email ?? 'unknown@example.com',
@@ -45,14 +56,43 @@ export function NotesProvider({ children, session }) {
                     avatarUrl: session.user.user_metadata?.avatar_url ?? undefined,
                 });
                 setConvexUserId(id);
-                setLoadingState({ progress: 70, message: 'Loading data...' });
+                setLoadingState({ progress: 60, message: 'Preparing encryption...' });
+
+                // Fetch user doc to read E2EE metadata
+                const userDoc = await convex.query(api.users.byExternalId, { externalId: session.user.id });
+                if (userDoc?.wrappedDekB64 && userDoc?.wrappedDekIvB64 && userDoc?.encSaltB64 && userDoc?.encIterations) {
+                    const kek = await deriveKekFromPassphrase(passphrase, userDoc.encSaltB64, userDoc.encIterations);
+                    const dek = await unwrapDek(userDoc.wrappedDekB64, userDoc.wrappedDekIvB64, kek);
+                    dekRef.current = dek; e2eeReadyRef.current = true;
+                } else {
+                    // First-time setup: create salt, derive KEK, generate DEK and wrap
+                    const saltB64 = generateSaltB64();
+                    const iterations = 310000;
+                    const kek = await deriveKekFromPassphrase(passphrase, saltB64, iterations);
+                    const dek = await generateDek();
+                    const { wrappedDekB64, wrappedIvB64 } = await wrapDek(dek, kek);
+                    dekRef.current = dek; e2eeReadyRef.current = true;
+                    // Store e2ee metadata on user
+                    await ensureUser({
+                        externalId: session.user.id,
+                        email: session.user.email ?? 'unknown@example.com',
+                        displayName: session.user.user_metadata?.full_name ?? undefined,
+                        avatarUrl: session.user.user_metadata?.avatar_url ?? undefined,
+                        encSaltB64: saltB64,
+                        encIterations: iterations,
+                        wrappedDekB64,
+                        wrappedDekIvB64: wrappedIvB64,
+                    });
+                }
+
+                setLoadingState({ progress: 80, message: 'Loading data...' });
             } catch (e) {
                 setError(e);
             } finally {
                 setIsInitialSync(false);
             }
         })();
-    }, [session, ensureUser]);
+    }, [session, ensureUser, convex]);
 
     // Subscribe to Convex data and normalize to frontend shape
     useEffect(() => {
@@ -67,13 +107,27 @@ export function NotesProvider({ children, session }) {
         }
 
         if (Array.isArray(listNotes)) {
-            const normalizedNotes = listNotes.map((n) => ({
-                ...n,
-                id: n._id,
-                // Ensure note.tags is an array of string ids for UI matching
-                tags: Array.isArray(n.tags) ? n.tags.map((tid) => String(tid)) : [],
-            }));
-            setNotes(normalizedNotes);
+            const decryptIfPossible = async (n) => {
+                if (!e2eeReadyRef.current || !dekRef.current) return n;
+                try {
+                    const patched = { ...n };
+                    if (n.titleEnc?.ct && n.titleEnc?.iv) patched.title = await decryptString(dekRef.current, n.titleEnc);
+                    if (n.descriptionEnc?.ct && n.descriptionEnc?.iv) patched.description = await decryptString(dekRef.current, n.descriptionEnc);
+                    if (n.contentEnc?.ct && n.contentEnc?.iv) patched.content = await decryptString(dekRef.current, n.contentEnc);
+                    return patched;
+                } catch {
+                    return n; // best-effort
+                }
+            };
+            (async () => {
+                const decrypted = await Promise.all(listNotes.map(decryptIfPossible));
+                const normalizedNotes = decrypted.map((n) => ({
+                    ...n,
+                    id: n._id,
+                    tags: Array.isArray(n.tags) ? n.tags.map((tid) => String(tid)) : [],
+                }));
+                setNotes(normalizedNotes);
+            })();
         }
 
         if (listNotes !== undefined || listTags !== undefined) {
@@ -84,13 +138,26 @@ export function NotesProvider({ children, session }) {
 
     const createNote = useCallback(async (noteData) => {
         if (!session?.user?.id) throw new Error('Not authenticated');
-        const created = await createNoteMutation({
+        let payload = {
             userId: convexUserId,
-            title: noteData.title ?? undefined,
-            description: noteData.description ?? undefined,
-            content: noteData.content ?? undefined,
+            title: undefined,
+            description: undefined,
+            content: undefined,
+            titleEnc: undefined,
+            descriptionEnc: undefined,
+            contentEnc: undefined,
             tags: noteData.tags ?? [],
-        });
+        };
+        if (e2eeReadyRef.current && dekRef.current) {
+            payload.titleEnc = noteData.title ? await encryptString(dekRef.current, noteData.title) : undefined;
+            payload.descriptionEnc = noteData.description ? await encryptString(dekRef.current, noteData.description) : undefined;
+            payload.contentEnc = noteData.content ? await encryptString(dekRef.current, noteData.content) : undefined;
+        } else {
+            payload.title = noteData.title ?? undefined;
+            payload.description = noteData.description ?? undefined;
+            payload.content = noteData.content ?? undefined;
+        }
+        const created = await createNoteMutation(payload);
         // Normalize return for callers expecting id
         return {
             ...created,
@@ -104,13 +171,26 @@ export function NotesProvider({ children, session }) {
     }, [deleteNoteMutation]);
 
     const updateNote = useCallback(async (noteId, noteData) => {
-        const updated = await updateNoteMutation({
+        let payload = {
             id: noteId,
-            title: noteData.title ?? undefined,
-            description: noteData.description ?? undefined,
-            content: noteData.content ?? undefined,
+            title: undefined,
+            description: undefined,
+            content: undefined,
+            titleEnc: undefined,
+            descriptionEnc: undefined,
+            contentEnc: undefined,
             tags: noteData.tags ?? undefined,
-        });
+        };
+        if (e2eeReadyRef.current && dekRef.current) {
+            payload.titleEnc = noteData.title !== undefined ? (noteData.title ? await encryptString(dekRef.current, noteData.title) : undefined) : undefined;
+            payload.descriptionEnc = noteData.description !== undefined ? (noteData.description ? await encryptString(dekRef.current, noteData.description) : undefined) : undefined;
+            payload.contentEnc = noteData.content !== undefined ? (noteData.content ? await encryptString(dekRef.current, noteData.content) : undefined) : undefined;
+        } else {
+            payload.title = noteData.title ?? undefined;
+            payload.description = noteData.description ?? undefined;
+            payload.content = noteData.content ?? undefined;
+        }
+        const updated = await updateNoteMutation(payload);
         return {
             ...updated,
             id: updated?._id,
