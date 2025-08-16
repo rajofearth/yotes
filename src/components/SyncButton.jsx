@@ -21,6 +21,7 @@ const SyncButton = () => {
 	const upsertTag = useMutation(api.tags.create);
 	const upsertNote = useMutation(api.notes.create);
 	const existingTags = useQuery(api.tags.list, convexUserId ? { userId: convexUserId } : 'skip');
+	const existingNotes = useQuery(api.notes.list, convexUserId ? { userId: convexUserId } : 'skip');
 	const existingTagMap = useMemo(() => {
 		if (!Array.isArray(existingTags)) return new Map();
 		const m = new Map();
@@ -123,6 +124,7 @@ const SyncButton = () => {
 	};
 
 	// UI states
+	const convexHasData = (Array.isArray(existingNotes) && existingNotes.length > 0) || (Array.isArray(existingTags) && existingTags.length > 0);
 	if (migrating) {
 		return (
 			<div className="fixed bottom-24 right-4 z-50 bg-bg-primary text-text-primary/80 rounded-full p-4 shadow-lg flex items-center gap-2 ring-1 ring-overlay/20" title={message || 'Migrating...'} role="status" aria-label="Migrating data">
@@ -131,6 +133,11 @@ const SyncButton = () => {
 				<span className="text-[10px] text-text-primary/50">{progress}%</span>
 			</div>
 		);
+	}
+
+	// If Convex already contains user data, hide the migration button
+	if (convexHasData) {
+		return null;
 	}
 
 	if (complete && isOnline) {
@@ -150,13 +157,7 @@ const SyncButton = () => {
 		);
 	}
 
-	if (isOnline && !hasLocalYotes && !complete) {
-		return (
-			<button onClick={migrate} className={`fixed bottom-24 right-4 z-50 bg-bg-primary text-text-primary hover:bg-overlay/10 rounded-full p-3 shadow-lg flex items-center justify-center transition-all duration-300 ring-1 ring-overlay/20`} title="Migrate local data to Convex">
-				<RotateCw className="h-4 w-4 text-gray-400" />
-			</button>
-		);
-	}
+	// Otherwise, only show when legacy data exists locally
 
 	return null;
 };
