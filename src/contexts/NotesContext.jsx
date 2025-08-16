@@ -19,16 +19,13 @@ export function NotesProvider({ children, session }) {
     const convex = useConvex();
     const ensureUser = useMutation(api.users.ensure);
     const [convexUserId, setConvexUserId] = useState(null);
-    const dekRef = useRef(null); // CryptoKey for data encryption
+    const dekRef = useRef(null);
     const e2eeReadyRef = useRef(false);
     const [isE2EEReady, setIsE2EEReady] = useState(false);
-    
-    // Passphrase modal state
     const [showPassphraseModal, setShowPassphraseModal] = useState(false);
     const [isFirstTimeSetup, setIsFirstTimeSetup] = useState(false);
     const [passphraseCallback, setPassphraseCallback] = useState(null);
-    
-    // Only fetch after E2EE is ready
+
     const listNotes = useQuery(api.notes.list, convexUserId && isE2EEReady ? { userId: convexUserId } : 'skip');
     const listTags = useQuery(api.tags.list, convexUserId && isE2EEReady ? { userId: convexUserId } : 'skip');
     const createNoteMutation = useMutation(api.notes.create);
@@ -38,16 +35,14 @@ export function NotesProvider({ children, session }) {
     const updateTagMutation = useMutation(api.tags.update);
     const deleteTagMutation = useMutation(api.tags.remove);
 
-    // Live Convex data subscription, gated by E2EE readiness
     useEffect(() => {
-            if (!session) {
-                setIsLoading(false);
-                return;
-            }
+        if (!session) {
+            setIsLoading(false);
+            return;
+        }
         (async () => {
             try {
                 setLoadingState({ progress: 40, message: 'Connecting to Convex...' });
-                
                 const id = await ensureUser({
                     externalId: session.user.id,
                     email: session.user.email ?? 'unknown@example.com',
@@ -57,11 +52,9 @@ export function NotesProvider({ children, session }) {
                 setConvexUserId(id);
                 setLoadingState({ progress: 60, message: 'Preparing encryption...' });
 
-                // Fetch user doc to read E2EE metadata
                 const userDoc = await convex.query(api.users.byExternalId, { externalId: session.user.id });
-                
                 const storedPassphrase = sessionStorage.getItem('yotes_passphrase');
-                
+
                 if (userDoc?.wrappedDekB64 && userDoc?.wrappedDekIvB64 && userDoc?.encSaltB64 && userDoc?.encIterations) {
                     if (storedPassphrase) {
                         try {
@@ -70,6 +63,7 @@ export function NotesProvider({ children, session }) {
                             dekRef.current = dek; 
                             e2eeReadyRef.current = true;
                             setIsE2EEReady(true);
+                            window.__yotesDek = dekRef.current;
                         } catch {
                             sessionStorage.removeItem('yotes_passphrase');
                             setShowPassphraseModal(true);
@@ -81,6 +75,7 @@ export function NotesProvider({ children, session }) {
                                 e2eeReadyRef.current = true;
                                 setIsE2EEReady(true);
                                 sessionStorage.setItem('yotes_passphrase', passphrase);
+                                window.__yotesDek = dekRef.current;
                                 setShowPassphraseModal(false);
                             });
                             return;
@@ -95,12 +90,12 @@ export function NotesProvider({ children, session }) {
                             e2eeReadyRef.current = true;
                             setIsE2EEReady(true);
                             sessionStorage.setItem('yotes_passphrase', passphrase);
+                            window.__yotesDek = dekRef.current;
                             setShowPassphraseModal(false);
                         });
                         return;
                     }
                 } else {
-                    // First-time setup
                     setShowPassphraseModal(true);
                     setIsFirstTimeSetup(true);
                     setPassphraseCallback(() => async (passphrase) => {
@@ -113,7 +108,7 @@ export function NotesProvider({ children, session }) {
                         e2eeReadyRef.current = true;
                         setIsE2EEReady(true);
                         sessionStorage.setItem('yotes_passphrase', passphrase);
-                        
+                        window.__yotesDek = dekRef.current;
                         await ensureUser({
                             externalId: session.user.id,
                             email: session.user.email ?? 'unknown@example.com',
@@ -138,16 +133,22 @@ export function NotesProvider({ children, session }) {
         })();
     }, [session, ensureUser, convex]);
 
-    // Subscribe to Convex data and normalize to frontend shape (only after E2EE ready)
     useEffect(() => {
         if (!session || !isE2EEReady) return;
 
         if (Array.isArray(listTags)) {
-            const normalizedTags = listTags.map((t) => ({
-                ...t,
-                id: t._id,
-            }));
-            setTags(normalizedTags);
+            (async () => {
+                const normalizedTags = await Promise.all(listTags.map(async (t) => {
+                    let name = undefined;
+                    let color = undefined;
+                    try {
+                        if (t?.nameEnc?.ct && t?.nameEnc?.iv) name = await decryptString(dekRef.current, t.nameEnc);
+                        if (t?.colorEnc?.ct && t?.colorEnc?.iv) color = await decryptString(dekRef.current, t.colorEnc);
+                    } catch {}
+                    return { ...t, id: t._id, name, color };
+                }));
+                setTags(normalizedTags);
+            })();
         }
 
         if (Array.isArray(listNotes)) {
@@ -160,7 +161,7 @@ export function NotesProvider({ children, session }) {
                     if (n.contentEnc?.ct && n.contentEnc?.iv) patched.content = await decryptString(dekRef.current, n.contentEnc);
                     return patched;
                 } catch {
-                    return n; // best-effort
+                    return n;
                 }
             };
             (async () => {
@@ -184,9 +185,6 @@ export function NotesProvider({ children, session }) {
         if (!session?.user?.id) throw new Error('Not authenticated');
         let payload = {
             userId: convexUserId,
-            title: undefined,
-            description: undefined,
-            content: undefined,
             titleEnc: undefined,
             descriptionEnc: undefined,
             contentEnc: undefined,
@@ -196,10 +194,6 @@ export function NotesProvider({ children, session }) {
             payload.titleEnc = noteData.title ? await encryptString(dekRef.current, noteData.title) : undefined;
             payload.descriptionEnc = noteData.description ? await encryptString(dekRef.current, noteData.description) : undefined;
             payload.contentEnc = noteData.content ? await encryptString(dekRef.current, noteData.content) : undefined;
-        } else {
-            payload.title = noteData.title ?? undefined;
-            payload.description = noteData.description ?? undefined;
-            payload.content = noteData.content ?? undefined;
         }
         const created = await createNoteMutation(payload);
         return {
@@ -216,9 +210,6 @@ export function NotesProvider({ children, session }) {
     const updateNote = useCallback(async (noteId, noteData) => {
         let payload = {
             id: noteId,
-            title: undefined,
-            description: undefined,
-            content: undefined,
             titleEnc: undefined,
             descriptionEnc: undefined,
             contentEnc: undefined,
@@ -228,10 +219,6 @@ export function NotesProvider({ children, session }) {
             payload.titleEnc = noteData.title !== undefined ? (noteData.title ? await encryptString(dekRef.current, noteData.title) : undefined) : undefined;
             payload.descriptionEnc = noteData.description !== undefined ? (noteData.description ? await encryptString(dekRef.current, noteData.description) : undefined) : undefined;
             payload.contentEnc = noteData.content !== undefined ? (noteData.content ? await encryptString(dekRef.current, noteData.content) : undefined) : undefined;
-        } else {
-            payload.title = noteData.title ?? undefined;
-            payload.description = noteData.description ?? undefined;
-            payload.content = noteData.content ?? undefined;
         }
         const updated = await updateNoteMutation(payload);
         return {
@@ -243,13 +230,18 @@ export function NotesProvider({ children, session }) {
 
     const createTag = useCallback(async (tagData) => {
         if (!session?.user?.id) throw new Error('Not authenticated');
+        const name = tagData.name;
         const color = tagData.color || 'bg-gray-500/20 text-gray-500';
-        const created = await createTagMutation({ userId: convexUserId, name: tagData.name, color });
+        const nameEnc = name ? await encryptString(dekRef.current, name) : undefined;
+        const colorEnc = color ? await encryptString(dekRef.current, color) : undefined;
+        const created = await createTagMutation({ userId: convexUserId, nameEnc, colorEnc });
         return { ...created, id: created?._id };
     }, [createTagMutation, session, convexUserId]);
 
     const updateTag = useCallback(async (tagId, tagData) => {
-        const updated = await updateTagMutation({ id: tagId, name: tagData.name, color: tagData.color });
+        const nameEnc = tagData.name !== undefined ? (tagData.name ? await encryptString(dekRef.current, tagData.name) : undefined) : undefined;
+        const colorEnc = tagData.color !== undefined ? (tagData.color ? await encryptString(dekRef.current, tagData.color) : undefined) : undefined;
+        const updated = await updateTagMutation({ id: tagId, nameEnc, colorEnc });
         return { ...updated, id: updated?._id };
     }, [updateTagMutation]);
 
@@ -265,6 +257,9 @@ export function NotesProvider({ children, session }) {
         if (passphraseCallback) {
             await passphraseCallback(passphrase);
         }
+        if (e2eeReadyRef.current && dekRef.current) {
+            window.__yotesDek = dekRef.current;
+        }
     };
 
     const handlePassphraseCancel = () => {
@@ -272,14 +267,13 @@ export function NotesProvider({ children, session }) {
     };
 
     const lockNotes = useCallback(() => {
-        // Clear key material and any decrypted data in memory/UI
         dekRef.current = null;
         e2eeReadyRef.current = false;
         setIsE2EEReady(false);
         setNotes([]);
         setTags([]);
         sessionStorage.removeItem('yotes_passphrase');
-        // Prompt to unlock again
+        delete window.__yotesDek;
         setShowPassphraseModal(true);
         setIsFirstTimeSetup(false);
         setPassphraseCallback(() => async (passphrase) => {
@@ -291,6 +285,7 @@ export function NotesProvider({ children, session }) {
                 e2eeReadyRef.current = true;
                 setIsE2EEReady(true);
                 sessionStorage.setItem('yotes_passphrase', passphrase);
+                window.__yotesDek = dekRef.current;
                 setShowPassphraseModal(false);
             } else {
                 throw new Error('No encryption setup found');
@@ -316,21 +311,16 @@ export function NotesProvider({ children, session }) {
             deleteTag,
             refreshData: async () => {},
             refreshFromIndexedDB: async () => {},
-            // Legacy fields kept for UI compatibility
             hasPendingChanges: false,
             manualSyncWithDrive: async () => {},
             isManualSyncing: false,
             syncProgressMessage: '',
             syncDiscrepancyDetected: false,
             checkSyncDiscrepancies: async () => false,
-            // E2EE functions
             isE2EEReady,
             lockNotes,
         }}>
-            {/* Render app content only after E2EE is ready to avoid any leakage */}
             {isE2EEReady ? children : null}
-
-            {/* Passphrase Modal */}
             <PassphraseModal
                 isOpen={showPassphraseModal}
                 onConfirm={handlePassphraseConfirm}

@@ -21,9 +21,6 @@ export const get = query({
 export const create = mutation({
   args: {
     userId: v.id("users"),
-    title: v.optional(v.string()),
-    description: v.optional(v.string()),
-    content: v.optional(v.string()),
     titleEnc: v.optional(v.object({ ct: v.string(), iv: v.string() })),
     descriptionEnc: v.optional(v.object({ ct: v.string(), iv: v.string() })),
     contentEnc: v.optional(v.object({ ct: v.string(), iv: v.string() })),
@@ -33,9 +30,6 @@ export const create = mutation({
     const now = Date.now();
     const id = await ctx.db.insert("notes", {
       userId: args.userId,
-      title: args.title,
-      description: args.description,
-      content: args.content,
       titleEnc: args.titleEnc,
       descriptionEnc: args.descriptionEnc,
       contentEnc: args.contentEnc,
@@ -50,21 +44,15 @@ export const create = mutation({
 export const update = mutation({
   args: {
     id: v.id("notes"),
-    title: v.optional(v.string()),
-    description: v.optional(v.string()),
-    content: v.optional(v.string()),
     titleEnc: v.optional(v.object({ ct: v.string(), iv: v.string() })),
     descriptionEnc: v.optional(v.object({ ct: v.string(), iv: v.string() })),
     contentEnc: v.optional(v.object({ ct: v.string(), iv: v.string() })),
     tags: v.optional(v.array(v.id("tags"))),
   },
-  handler: async (ctx, { id, title, description, content, titleEnc, descriptionEnc, contentEnc, tags }) => {
+  handler: async (ctx, { id, titleEnc, descriptionEnc, contentEnc, tags }) => {
     const note = await ctx.db.get(id);
     if (!note) throw new Error("Note not found");
     await ctx.db.patch(id, {
-      title: title ?? note.title,
-      description: description ?? note.description,
-      content: content ?? note.content,
       titleEnc: titleEnc ?? note.titleEnc,
       descriptionEnc: descriptionEnc ?? note.descriptionEnc,
       contentEnc: contentEnc ?? note.contentEnc,

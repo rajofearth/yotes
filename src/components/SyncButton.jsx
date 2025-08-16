@@ -6,10 +6,11 @@ import { useToast } from '../contexts/ToastContext';
 import { openDB } from '../utils/indexedDB';
 import { useMutation, useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
+import { encryptString } from '../lib/e2ee';
 
 const SyncButton = () => {
 	const isOnline = useOnlineStatus();
-	const { convexUserId } = useNotes();
+	const { convexUserId, isE2EEReady } = useNotes();
 	const showToast = useToast();
 	const [isAnimating, setIsAnimating] = useState(false);
 	const [hasLocalYotes, setHasLocalYotes] = useState(false);
@@ -26,7 +27,8 @@ const SyncButton = () => {
 		if (!Array.isArray(existingTags)) return new Map();
 		const m = new Map();
 		for (const t of existingTags) {
-			if (t?.name) m.set(String(t.name).toLowerCase(), t._id);
+			// We cannot decrypt here without DEK; just map by id
+			m.set(String(t._id), t._id);
 		}
 		return m;
 	}, [existingTags]);
@@ -54,6 +56,7 @@ const SyncButton = () => {
 		if (migrating) return;
 		if (!isOnline) { showToast('Connect to the internet to migrate.', 'info'); return; }
 		if (!convexUserId) { showToast('Please wait, preparing your account...', 'info'); return; }
+		if (!isE2EEReady) { showToast('Unlock encryption first to migrate.', 'info'); return; }
 		setMigrating(true);
 		setComplete(false);
 		setProgress(5);
@@ -66,8 +69,7 @@ const SyncButton = () => {
 			const total = (tags?.length || 0) + (notes?.length || 0);
 			let done = 0;
 
-			// Build mapping from legacy tag id and name to Convex tag Id
-			const nameToId = new Map(existingTagMap);
+			const nameToId = new Map();
 			const legacyIdToConvexId = new Map();
 
 			setMessage(`Migrating ${tags.length} tags...`);
@@ -78,7 +80,9 @@ const SyncButton = () => {
 				let convexTagId = name ? nameToId.get(name.toLowerCase()) : undefined;
 				if (!convexTagId && name) {
 					try {
-						const created = await upsertTag({ userId: convexUserId, name, color });
+						const nameEnc = await encryptString(window.__yotesDek, name);
+						const colorEnc = await encryptString(window.__yotesDek, color);
+						const created = await upsertTag({ userId: convexUserId, nameEnc, colorEnc });
 						convexTagId = created?._id || created?.id || created;
 						if (convexTagId) nameToId.set(name.toLowerCase(), convexTagId);
 					} catch (e) {
@@ -94,13 +98,10 @@ const SyncButton = () => {
 				const legacyTags = Array.isArray(n?.tags) ? n.tags : [];
 				const mappedTags = legacyTags.map((lt) => legacyIdToConvexId.get(lt)).filter(Boolean);
 				try {
-					await upsertNote({
-						userId: convexUserId,
-						title: n?.title || undefined,
-						description: n?.description || undefined,
-						content: n?.content || undefined,
-						tags: mappedTags,
-					});
+					const titleEnc = n?.title ? await encryptString(window.__yotesDek, n.title) : undefined;
+					const descriptionEnc = n?.description ? await encryptString(window.__yotesDek, n.description) : undefined;
+					const contentEnc = n?.content ? await encryptString(window.__yotesDek, n.content) : undefined;
+					await upsertNote({ userId: convexUserId, titleEnc, descriptionEnc, contentEnc, tags: mappedTags });
 				} catch (e) {
 					// continue
 				}
@@ -129,7 +130,6 @@ const SyncButton = () => {
 		);
 	}
 
-	// If Convex already contains user data, hide the migration button
 	if (convexHasData) {
 		return null;
 	}
@@ -150,8 +150,6 @@ const SyncButton = () => {
 			</button>
 		);
 	}
-
-	// Otherwise, only show when legacy data exists locally
 
 	return null;
 };

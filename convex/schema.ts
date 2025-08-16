@@ -3,62 +3,51 @@ import { v } from "convex/values";
 
 export default defineSchema({
   users: defineTable({
-    // Supabase user id or other external auth provider id
     externalId: v.string(),
     email: v.string(),
     displayName: v.optional(v.string()),
     avatarUrl: v.optional(v.string()),
-    // E2EE config (no secrets stored) - optional to allow migration
-    encSaltB64: v.optional(v.string()), // base64 salt for PBKDF2
-    encIterations: v.optional(v.number()), // PBKDF2 iterations
-    wrappedDekB64: v.optional(v.string()), // base64-wrapped DEK with KEK
-    wrappedDekIvB64: v.optional(v.string()), // AES-GCM IV used to wrap DEK
-    createdAt: v.number(), // Date.now() in ms
-    updatedAt: v.number(), // Date.now() in ms
+    encSaltB64: v.optional(v.string()),
+    encIterations: v.optional(v.number()),
+    wrappedDekB64: v.optional(v.string()),
+    wrappedDekIvB64: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
   })
-    .index("byExternalId", ["externalId"]) // Enforce uniqueness in mutations
+    .index("byExternalId", ["externalId"]) 
     .index("byEmail", ["email"]),
 
   tags: defineTable({
     userId: v.id("users"),
-    name: v.string(),
-    color: v.string(), // Tailwind class e.g. "bg-purple-600/20 text-purple-600"
+    nameEnc: v.object({ ct: v.string(), iv: v.string() }),
+    colorEnc: v.object({ ct: v.string(), iv: v.string() }),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
-    .index("byUser", ["userId"]) // Query all tags for a user
-    .index("byUserName", ["userId", "name"]), // Support uniqueness checks per user
+    .index("byUser", ["userId"]),
 
   notes: defineTable({
     userId: v.id("users"),
-    // Title/description/content are optional to allow quick notes and empty fields during drafting
-    title: v.optional(v.string()), // legacy plaintext (migration path)
-    description: v.optional(v.string()), // legacy plaintext
-    content: v.optional(v.string()), // legacy plaintext
-    // Encrypted variants (AES-GCM base64 fields)
     titleEnc: v.optional(v.object({ ct: v.string(), iv: v.string() })),
     descriptionEnc: v.optional(v.object({ ct: v.string(), iv: v.string() })),
     contentEnc: v.optional(v.object({ ct: v.string(), iv: v.string() })),
-    // Array of tag references
     tags: v.array(v.id("tags")),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
-    .index("byUser", ["userId"]) // Fetch all notes for a user
-    .index("byUserUpdatedAt", ["userId", "updatedAt"]), // Sort recent notes efficiently
+    .index("byUser", ["userId"]) 
+    .index("byUserUpdatedAt", ["userId", "updatedAt"]),
 
-  // Per-user AI settings. Never return apiKey in query functions.
   aiSettings: defineTable({
     userId: v.id("users"),
     provider: v.literal("gemini"),
     enabled: v.boolean(),
-    apiKey: v.string(),
+    apiKeyEnc: v.optional(v.object({ ct: v.string(), iv: v.string() })),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
     .index("byUser", ["userId"]).index("byUserProvider", ["userId", "provider"]),
 
-  // AI request/usage log for observability, rate limiting, and debugging
   aiRequests: defineTable({
     userId: v.id("users"),
     kind: v.union(v.literal("image_to_note"), v.literal("search_summary")),
@@ -67,25 +56,23 @@ export default defineSchema({
     status: v.union(v.literal("success"), v.literal("error")),
     error: v.optional(v.string()),
     inputHash: v.optional(v.string()),
-    // token accounting if available
     inputTokens: v.optional(v.number()),
     outputTokens: v.optional(v.number()),
     createdAt: v.number(),
   })
-    .index("byUserCreatedAt", ["userId", "createdAt"]) // time-ordered per user
-    .index("byUserKindCreatedAt", ["userId", "kind", "createdAt"]) // filter by kind
-    .index("byInputHash", ["inputHash"]), // enable idempotency/caching by input
+    .index("byUserCreatedAt", ["userId", "createdAt"]) 
+    .index("byUserKindCreatedAt", ["userId", "kind", "createdAt"]) 
+    .index("byInputHash", ["inputHash"]),
 
-  // Cache of AI search summaries to reduce cost and latency
   aiSummaries: defineTable({
     userId: v.id("users"),
-    cacheKey: v.string(), // e.g., hash of query + sorted tag ids
-    summary: v.any(), // JSON blob returned by the model
+    cacheKey: v.string(),
+    summary: v.any(),
     createdAt: v.number(),
     expiresAt: v.optional(v.number()),
   })
-    .index("byUserCacheKey", ["userId", "cacheKey"]) // upsert by cache key
-    .index("byExpiresAt", ["expiresAt"]), // background cleanup
+    .index("byUserCacheKey", ["userId", "cacheKey"]) 
+    .index("byExpiresAt", ["expiresAt"]),
 });
 
 

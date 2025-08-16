@@ -14,20 +14,15 @@ export const list = query({
 export const create = mutation({
   args: {
     userId: v.id("users"),
-    name: v.string(),
-    color: v.string(),
+    nameEnc: v.object({ ct: v.string(), iv: v.string() }),
+    colorEnc: v.object({ ct: v.string(), iv: v.string() }),
   },
-  handler: async (ctx, { userId, name, color }) => {
-    const existing = await ctx.db
-      .query("tags")
-      .withIndex("byUserName", (q) => q.eq("userId", userId).eq("name", name))
-      .unique();
-    if (existing) throw new Error(`Tag "${name}" exists.`);
+  handler: async (ctx, { userId, nameEnc, colorEnc }) => {
     const now = Date.now();
     const id = await ctx.db.insert("tags", {
       userId,
-      name,
-      color,
+      nameEnc,
+      colorEnc,
       createdAt: now,
       updatedAt: now,
     });
@@ -36,14 +31,13 @@ export const create = mutation({
 });
 
 export const update = mutation({
-  args: { id: v.id("tags"), name: v.optional(v.string()), color: v.optional(v.string()) },
-  handler: async (ctx, { id, name, color }) => {
+  args: { id: v.id("tags"), nameEnc: v.optional(v.object({ ct: v.string(), iv: v.string() })), colorEnc: v.optional(v.object({ ct: v.string(), iv: v.string() })) },
+  handler: async (ctx, { id, nameEnc, colorEnc }) => {
     const tag = await ctx.db.get(id);
     if (!tag) throw new Error("Tag not found");
-    if (name && name.trim() === "") throw new Error("Tag name required.");
     await ctx.db.patch(id, {
-      name: name ?? tag.name,
-      color: color ?? tag.color,
+      nameEnc: nameEnc ?? tag.nameEnc,
+      colorEnc: colorEnc ?? tag.colorEnc,
       updatedAt: Date.now(),
     });
     return await ctx.db.get(id);
