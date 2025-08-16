@@ -1,9 +1,9 @@
 import { getAISettings } from './aiSummaryService';
 
 // Generate note fields from image using Gemini 2.5 Flash
-export const generateNoteFromImage = async (file) => {
+export const generateNoteFromImage = async (file, userId) => {
   // Get AI settings
-  const aiSettings = await getAISettings();
+  const aiSettings = await getAISettings(userId);
   if (!aiSettings || !aiSettings.enabled || !aiSettings.apiKey) {
     throw new Error('AI features are not enabled');
   }

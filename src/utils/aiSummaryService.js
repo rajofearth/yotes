@@ -1,18 +1,11 @@
-import { getFromDB } from './indexedDB';
+import { convex } from '../lib/convexClient.tsx';
+import { api } from '../../convex/_generated/api';
 
 // Function to fetch AI settings from Google Drive
-const getAISettings = async () => {
+const getAISettings = async (userId) => {
   try {
-    // Access AI settings from session cache
-    const session = await getFromDB('sessions', 'session');
-    if (!session || !session.aiSettings) {
-      // Try to get from settings stored directly in session
-      if (session?.user?.aiSettings) {
-        return session.user.aiSettings;
-      }
-      return null;
-    }
-    return session.aiSettings;
+    const settings = await convex.query(api.ai.getSettings, userId ? { userId } : {});
+    return settings;
   } catch (error) {
     console.error('Error fetching AI settings:', error);
     return null;
@@ -20,12 +13,9 @@ const getAISettings = async () => {
 };
 
 // Check if AI features are available
-export const canUseAIFeatures = async (isOnline) => {
-  if (!isOnline) {
-    return false;
-  }
-  
-  const aiSettings = await getAISettings();
+export const canUseAIFeatures = async (isOnline, userId) => {
+  if (!isOnline) return false;
+  const aiSettings = await getAISettings(userId);
   return aiSettings && aiSettings.enabled && aiSettings.apiKey;
 };
 

@@ -2,12 +2,15 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.jsx'
+import { ConvexProviderWrapper } from './lib/convexClient.tsx'
 import { OnlineStatusProvider } from './contexts/OnlineStatusContext';
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <OnlineStatusProvider>
-      <App />
+      <ConvexProviderWrapper>
+        <App />
+      </ConvexProviderWrapper>
     </OnlineStatusProvider>
   </StrictMode>,
 )

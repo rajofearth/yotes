@@ -11,7 +11,7 @@ import { canUseAIFeatures } from '../utils/aiSummaryService';
 
 export default function Home() {
   const isDesktop = useMediaQuery({ minWidth: 768 }); 
-  const { notes, tags, error, refreshData, refreshFromIndexedDB } = useNotes();
+  const { notes, tags, error } = useNotes();
   const { aiSettings, handleTagAction } = useSettings();
   const location = useLocation();
   const navigate = useNavigate();
@@ -21,19 +21,7 @@ export default function Home() {
   const [aiEnabled, setAiEnabled] = useState(false);
   const isOnline = useOnlineStatus();
 
-  // Force refresh from IndexedDB when component mounts, especially in offline mode
-  useEffect(() => {
-    // Immediately refresh from IndexedDB when page loads, especially important offline
-    const loadDataFromIndexedDB = async () => {
-      try {
-        await refreshFromIndexedDB();
-        console.log('Home: Refreshed data from IndexedDB');
-      } catch (err) {
-        console.error('Failed to refresh data from IndexedDB:', err);
-      }
-    };
-    loadDataFromIndexedDB();
-  }, [refreshFromIndexedDB]);
+  // No IndexedDB refresh with Convex
 
   // Check if AI features can be used
   useEffect(() => {
@@ -47,15 +35,11 @@ export default function Home() {
 
   useEffect(() => {
     if (location.state?.refresh) {
-      if (isOnline) {
-        refreshData();
-      } else {
-        refreshFromIndexedDB(); 
-      }
+      // Convex live queries keep data fresh
       navigate('/', { replace: true, state: {} });
     }
     setFilteredNotes(applyFiltersAndSearch(notes, searchQuery, selectedTagIds));
-  }, [notes, searchQuery, selectedTagIds, location.state?.refresh, refreshData, refreshFromIndexedDB, navigate, isOnline]);
+  }, [notes, searchQuery, selectedTagIds, location.state?.refresh, navigate, isOnline]);
 
   const handleSearch = useCallback(debounce(query => setSearchQuery(query), 300), []);
   const handleFilterChange = tagIds => setSelectedTagIds(tagIds.length === 0 ? ['all'] : tagIds);
@@ -72,7 +56,7 @@ export default function Home() {
     notes,
     tags,
     error,
-    refreshData: isOnline ? refreshData : refreshFromIndexedDB, 
+    refreshData: async () => {},
     onSearch: handleSearch,
     onFilterChange: handleFilterChange,
     filteredNotes,

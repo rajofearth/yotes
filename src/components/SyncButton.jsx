@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useNotes } from '../hooks/useNotes';
 import { useOnlineStatus } from '../contexts/OnlineStatusContext';
 import { Loader2, RefreshCw, Upload, Download } from 'lucide-react';
-import { getSyncQueue } from '../utils/indexedDB';
-import { useGoogleDrive } from '../contexts/GoogleDriveContext';
+// Drive/IndexedDB removed with Convex migration
+// import { getSyncQueue } from '../utils/indexedDB';
 import { useToast } from '../contexts/ToastContext';
 
 const SyncButton = () => {
@@ -16,7 +16,6 @@ const SyncButton = () => {
   } = useNotes();
   
   const isOnline = useOnlineStatus();
-  const { driveApi, folderIds } = useGoogleDrive();
   const showToast = useToast();
   const [isAnimating, setIsAnimating] = useState(false);
   const [hasLocalChanges, setHasLocalChanges] = useState(false);
@@ -25,24 +24,13 @@ const SyncButton = () => {
   
   // Check sync queue directly to confirm changes
   useEffect(() => {
-    const checkSyncQueue = async () => {
-      try {
-        const queue = await getSyncQueue();
-        setHasLocalChanges(queue.length > 0);
-      } catch (err) {
-        // Silent error - we'll rely on hasPendingChanges if this fails
-      }
-    };
-    
-    checkSyncQueue();
-    const interval = setInterval(checkSyncQueue, 5000);
-    return () => clearInterval(interval);
+    setHasLocalChanges(false);
   }, []);
   
   // Check for sync discrepancies between IndexedDB and Drive
   useEffect(() => {
     let cancelled = false;
-    if (!isOnline || !driveApi || !folderIds) {
+    if (!isOnline) {
       setSyncDiscrepancyDetected(false);
       return;
     }
@@ -66,7 +54,7 @@ const SyncButton = () => {
       cancelled = true;
       clearInterval(interval);
     };
-  }, [isOnline, driveApi, folderIds, isManualSyncing, checkSyncDiscrepancies]);
+  }, [isOnline, isManualSyncing, checkSyncDiscrepancies]);
   
   // Add animation effect when changes are pending
   useEffect(() => {
@@ -88,7 +76,7 @@ const SyncButton = () => {
   // Manually check for sync discrepancies
   const handleForceCheck = async (e) => {
     e.stopPropagation();
-    if (!isOnline || !driveApi || !folderIds || isCheckingSync || isManualSyncing) {
+    if (!isOnline || isCheckingSync || isManualSyncing) {
       return;
     }
     
@@ -213,7 +201,7 @@ const SyncButton = () => {
   }
   
   // Default - show refresh button when online
-  if (isOnline && driveApi && folderIds) {
+  if (isOnline) {
     return (
       <button 
         onClick={handleForceCheck}

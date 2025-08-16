@@ -3,10 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { Analytics } from '@vercel/analytics/react';
 import { supabase } from './utils/supabaseClient';
 import { findSupabaseLocalStorageKey } from './hooks/useSettings';
-import {
-  GoogleDriveProvider,
-  useGoogleDrive,
-} from './contexts/GoogleDriveContext';
+// GoogleDrive removed; using Convex
 import { ToastProvider, useToast } from './contexts/ToastContext';
 import { NotesProvider, useNotes } from './contexts/NotesContext';
 import { useOnlineStatus } from './contexts/OnlineStatusContext';
@@ -28,7 +25,7 @@ import SyncButton from './components/SyncButton';
 function AppContent({ session, isAuthLoading, isInitialLoad, setIsInitialLoad }) {
   const isOnline = useOnlineStatus();
   const showToast = useToast();
-  const { isLoading: isDriveLoading, error: driveError } = useGoogleDrive();
+  const { isLoading: isDriveLoading, error: driveError } = { isLoading: false, error: null };
   const {
     isLoading: isNotesLoading, // This now primarily reflects cache loading state
     isInitialSync, // Reflects the full initial load sequence (cache + optional drive)
@@ -193,10 +190,10 @@ function AppContent({ session, isAuthLoading, isInitialLoad, setIsInitialLoad })
       </Suspense>
       <OfflineBadge />
       <SyncTriggerBadge
-        hasPending={hasPendingChanges}
-        onSync={manualSyncWithDrive}
-        isSyncing={isManualSyncing}
-        syncDiscrepancyDetected={syncDiscrepancyDetected}
+        hasPending={false}
+        onSync={async () => {}}
+        isSyncing={false}
+        syncDiscrepancyDetected={false}
       />
       <SyncButton />
     </ErrorBoundary>
@@ -281,7 +278,6 @@ function App() {
   return (
     <ToastProvider>
       <Router>
-        <GoogleDriveProvider session={!isAuthLoading ? session : undefined}>
           <NotesProvider session={!isAuthLoading ? session : undefined}>
             <AppContent
               session={session}
@@ -292,7 +288,6 @@ function App() {
             <PWAReloadPrompt />
             <Analytics />
           </NotesProvider>
-        </GoogleDriveProvider>
       </Router>
     </ToastProvider>
   );
