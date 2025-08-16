@@ -22,8 +22,7 @@ import { Input } from '../components/ui/input';
 import { useNotes } from '../hooks/useNotes';
 import { useConvex, useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
-import JSZip from 'jszip';
-import { decryptString } from '../lib/e2ee';
+import { buildExportZip } from '../services/exporter';
 
 export default function Settings() {
     const {
@@ -92,7 +91,6 @@ export default function Settings() {
         if (!exportPass || exportPass.length < 8) return;
         try {
             setExportBusy(true);
-            const zip = new JSZip();
 
             const profile = {
                 externalId: user?.id || null,
@@ -105,26 +103,13 @@ export default function Settings() {
                 tags: tags.map(t => ({ id: t.id, name: t.name || '', color: t.color || '', createdAt: t.createdAt, updatedAt: t.updatedAt })),
             };
 
-            let ai = { enabled: false, apiKey: null };
-            try {
-                if (rawAI?.apiKeyEnc && window.__yotesDek) {
-                    ai = { enabled: !!rawAI.enabled, apiKey: await decryptString(window.__yotesDek, rawAI.apiKeyEnc) };
-                } else {
-                    ai = { enabled: !!rawAI?.enabled, apiKey: null };
-                }
-            } catch {
-                ai = { enabled: !!rawAI?.enabled, apiKey: null };
-            }
-
-            const meta = { exportedAt: new Date().toISOString(), version: '1.0', format: 'yotes-export' };
-
-            zip.file('profile.json', JSON.stringify(profile, null, 2));
-            zip.file('notes.json', JSON.stringify(data.notes, null, 2));
-            zip.file('tags.json', JSON.stringify(data.tags, null, 2));
-            zip.file('ai.json', JSON.stringify(ai, null, 2));
-            zip.file('meta.json', JSON.stringify(meta, null, 2));
-
-            const blob = await zip.generateAsync({ type: 'blob' });
+            const blob = await buildExportZip({
+                dek: window.__yotesDek || null,
+                profile,
+                notes,
+                tags,
+                aiRaw: rawAI || null,
+            });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
