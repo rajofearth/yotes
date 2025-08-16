@@ -54,11 +54,28 @@ export function NotesProvider({ children, session }) {
         })();
     }, [session, ensureUser]);
 
-    // Subscribe to Convex data
+    // Subscribe to Convex data and normalize to frontend shape
     useEffect(() => {
         if (!session) return;
-        if (Array.isArray(listNotes)) setNotes(listNotes);
-        if (Array.isArray(listTags)) setTags(listTags);
+
+        if (Array.isArray(listTags)) {
+            const normalizedTags = listTags.map((t) => ({
+                ...t,
+                id: t._id,
+            }));
+            setTags(normalizedTags);
+        }
+
+        if (Array.isArray(listNotes)) {
+            const normalizedNotes = listNotes.map((n) => ({
+                ...n,
+                id: n._id,
+                // Ensure note.tags is an array of string ids for UI matching
+                tags: Array.isArray(n.tags) ? n.tags.map((tid) => String(tid)) : [],
+            }));
+            setNotes(normalizedNotes);
+        }
+
         if (listNotes !== undefined || listTags !== undefined) {
             setIsLoading(false);
             setLoadingState({ progress: 100, message: 'Data loaded' });
@@ -74,7 +91,12 @@ export function NotesProvider({ children, session }) {
             content: noteData.content ?? undefined,
             tags: noteData.tags ?? [],
         });
-        return created;
+        // Normalize return for callers expecting id
+        return {
+            ...created,
+            id: created?._id,
+            tags: Array.isArray(created?.tags) ? created.tags.map((tid) => String(tid)) : [],
+        };
     }, [createNoteMutation, session, convexUserId]);
 
     const deleteNote = useCallback(async (noteId) => {
@@ -89,16 +111,23 @@ export function NotesProvider({ children, session }) {
             content: noteData.content ?? undefined,
             tags: noteData.tags ?? undefined,
         });
-        return updated;
+        return {
+            ...updated,
+            id: updated?._id,
+            tags: Array.isArray(updated?.tags) ? updated.tags.map((tid) => String(tid)) : [],
+        };
     }, [updateNoteMutation]);
 
     const createTag = useCallback(async (tagData) => {
         if (!session?.user?.id) throw new Error('Not authenticated');
-        return await createTagMutation({ userId: convexUserId, name: tagData.name, color: tagData.color });
+        const color = tagData.color || 'bg-gray-500/20 text-gray-500';
+        const created = await createTagMutation({ userId: convexUserId, name: tagData.name, color });
+        return { ...created, id: created?._id };
     }, [createTagMutation, session, convexUserId]);
 
     const updateTag = useCallback(async (tagId, tagData) => {
-        return await updateTagMutation({ id: tagId, name: tagData.name, color: tagData.color });
+        const updated = await updateTagMutation({ id: tagId, name: tagData.name, color: tagData.color });
+        return { ...updated, id: updated?._id };
     }, [updateTagMutation]);
 
     const deleteTag = useCallback(async (tagId) => {
