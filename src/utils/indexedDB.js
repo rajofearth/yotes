@@ -29,7 +29,7 @@ export const openDB = () => {
                 db.onclose = () => activeConnections.delete(db); resolve(db);
             };
             request.onerror = () => reject(request.error);
-            request.onblocked = () => { console.warn("IndexedDB open blocked, maybe due to other tabs?"); reject(new Error("IndexedDB blocked")); };
+            request.onblocked = () => { reject(new Error("IndexedDB blocked")); };
         });
     }
     return dbPromise;
@@ -54,13 +54,9 @@ export const getFromDB = (storeName, key) => performTransaction(storeName, 'read
         const request = store.get(key);
         request.onsuccess = () => {
             const result = request.result ? request.result.value : null;
-            if (storeName === NOTES_STORE && key === 'notes_data') {
-                console.log(`IndexedDB: Retrieved ${result ? (Array.isArray(result) ? result.length : 1) : 0} items from ${storeName}/${key}`);
-            }
             resolve(result);
         };
         request.onerror = (event) => {
-            console.error(`IndexedDB: Error getting ${key} from ${storeName}:`, request.error || event.target.error);
             reject(request.error || event.target.error || new Error(`Failed to get ${key} from ${storeName}`));
         };
     } catch (err) {
@@ -101,7 +97,7 @@ export const clearDB = async () => {
         });
         sessionStorage.clear();
     } catch (err) {
-        console.error("Error clearing DB:", err);
+        
     }
 };
 
@@ -110,14 +106,13 @@ export const deleteDB = async () => {
         try {
             const db = await dbPromise; activeConnections.forEach(c => { try { c.close() } catch{} });
             activeConnections.clear(); dbPromise = null;
-        } catch (err) { console.error("Error closing connections before delete:", err)}
+        } catch (err) {}
     }
     if (typeof indexedDB === 'undefined') return;
     return new Promise((resolve, reject) => {
         const request = indexedDB.deleteDatabase(DB_NAME);
         request.onsuccess = resolve; request.onerror = reject;
         request.onblocked = () => {
-            console.warn("IndexedDB deletion blocked, trying closing connections again.");
             activeConnections.forEach(c => { try { c.close() } catch{} }); activeConnections.clear();
             setTimeout(() => {
                 const retry = indexedDB.deleteDatabase(DB_NAME);
@@ -136,22 +131,13 @@ const shouldRefreshCache = async (storeName) => {
 };
 
 export const mergeData = (localData = [], remoteData = [], idKey = 'id') => {
-    // Create a map for quick lookup
     const dataMap = new Map();
-    
-    // Add all local data to map
     localData.forEach(item => dataMap.set(item[idKey], item));
-    
-    // Check remote data - keep newer versions
     remoteData.forEach(remoteItem => {
         const localItem = dataMap.get(remoteItem[idKey]);
-        
-        // If no local item or remote item is newer, use remote
         if (!localItem || new Date(remoteItem.updatedAt) > new Date(localItem.updatedAt)) {
             dataMap.set(remoteItem[idKey], remoteItem);
         }
     });
-    
-    // Convert map back to array
     return Array.from(dataMap.values());
 };

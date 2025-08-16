@@ -42,7 +42,7 @@ export default defineConfig({
       manifest: {
         name: 'Yotes',
         short_name: 'Yotes',
-        description: 'Privacy-first notes app integrated with Google Drive.',
+        description: 'Privacy-first notes app.',
         start_url: '/',
         scope: '/',
         display: 'standalone',

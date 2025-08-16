@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../utils/supabaseClient';
-import { setInDB, openDB } from '../../utils/indexedDB'; // Ensure openDB is imported if not already
+import { setInDB, openDB } from '../../utils/indexedDB';
 
 export default function AuthCallback() {
   const navigate = useNavigate();
@@ -10,35 +10,25 @@ export default function AuthCallback() {
   useEffect(() => {
     const handleAuthCallback = async () => {
       try {
-        // Ensure DB is ready before proceeding
         await openDB();
 
-        // Let Supabase handle the session establishment from the URL hash
-        // This should automatically update localStorage via the Supabase client library
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
         if (sessionError) {
-            // If getSession fails immediately after redirect, try refreshing once
-            console.warn("AuthCallback: getSession failed, trying refreshSession.", sessionError);
             const { error: refreshError } = await supabase.auth.refreshSession();
-            if (refreshError) throw refreshError; // If refresh fails, throw error
+            if (refreshError) throw refreshError;
 
-            // Retry getting session after refresh
              const { data: { session: refreshedSession }, error: refreshedError } = await supabase.auth.getSession();
              if (refreshedError) throw refreshedError;
 
              if (!refreshedSession?.provider_token || !refreshedSession?.provider_refresh_token) {
-                 console.error('AuthCallback Error: Google tokens still missing after refresh.');
                  throw new Error('Google authentication incomplete: Tokens missing.');
              }
-              // Use the refreshed session
               await setInDB('sessions', 'session', refreshedSession);
               navigate('/', { replace: true });
 
 
         } else if (!session?.provider_token || !session?.provider_refresh_token) {
-             // Sometimes getSession might succeed but tokens aren't immediately available
-             console.warn('AuthCallback Warning: Google tokens missing initially, attempting refreshSession.');
              const { error: refreshError } = await supabase.auth.refreshSession();
              if (refreshError) throw refreshError;
 
@@ -46,28 +36,18 @@ export default function AuthCallback() {
              if (refreshedError) throw refreshedError;
 
              if (!refreshedSession?.provider_token || !refreshedSession?.provider_refresh_token) {
-                 console.error('AuthCallback Error: Google tokens still missing after refresh.');
                  throw new Error('Google authentication incomplete: Tokens missing after refresh.');
              }
               await setInDB('sessions', 'session', refreshedSession);
               navigate('/', { replace: true });
 
         } else {
-            // Session looks good on first try, save it to IndexedDB
             await setInDB('sessions', 'session', session);
             navigate('/', { replace: true });
         }
 
       } catch (error) {
-        console.error('Auth callback error:', error);
         setErrorMessage(`Authentication failed: ${error.message}`);
-        // Optional: Delay redirect slightly to show error
-        // setTimeout(() => {
-        //     navigate('/login', {
-        //         replace: true,
-        //         state: { error: `Authentication failed: ${error.message}` },
-        //     });
-        // }, 3000);
          navigate('/login', {
              replace: true,
              state: { error: `Authentication failed: ${error.message}` },

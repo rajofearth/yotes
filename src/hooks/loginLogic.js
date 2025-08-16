@@ -1,5 +1,4 @@
-// src/hooks/loginLogic.js
-import { useState } from 'react'; // Added missing import
+import { useState } from 'react';
 import { supabase } from '../utils/supabaseClient';
 
 const GOOGLE_DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';

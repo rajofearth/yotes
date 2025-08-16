@@ -1,13 +1,11 @@
 import { convex } from '../lib/convexClient.tsx';
 import { api } from '../../convex/_generated/api';
 
-// Function to fetch AI settings from Google Drive
 const getAISettings = async (userId) => {
   try {
     const settings = await convex.query(api.ai.getSettings, userId ? { userId } : {});
     return settings;
-  } catch (error) {
-    console.error('Error fetching AI settings:', error);
+  } catch {
     return null;
   }
 };
@@ -26,7 +24,6 @@ export const generateSearchSummary = async (searchResults, searchQuery, apiKey) 
   }
 
   try {
-    // Format the search results for the AI
     const formattedResults = searchResults.map(note => ({
       id: note.id,
       title: note.title,
@@ -35,7 +32,6 @@ export const generateSearchSummary = async (searchResults, searchQuery, apiKey) 
       createdAt: note.createdAt
     }));
 
-    // Construct the prompt
     const prompt = {
       contents: [
         {
@@ -74,15 +70,12 @@ Respond with ONLY the JSON object and no additional text.`
       ]
     };
 
-    // API endpoint for Gemini 2.0 Flash
     const endpoint = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
     
-    // Make request to Google Gemini API
     const response = await fetch(endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        // API key sent in header to avoid placing it in URL parameters per security best practices [Gemini API docs - API key best practices](https://ai.google.dev/gemini-api/docs/api-key)
         'x-goog-api-key': apiKey
       },
       body: JSON.stringify(prompt),
@@ -95,14 +88,12 @@ Respond with ONLY the JSON object and no additional text.`
 
     const data = await response.json();
 
-    // Parse the response - Gemini should return JSON directly
     const textResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
     
     if (!textResponse) {
       throw new Error('Invalid response from API');
     }
     
-    // Extract the JSON part from the response
     let jsonMatch = textResponse.match(/\{[\s\S]*\}/);
     let summary;
     
@@ -110,7 +101,6 @@ Respond with ONLY the JSON object and no additional text.`
       try {
         summary = JSON.parse(jsonMatch[0]);
       } catch (err) {
-        console.error('Error parsing JSON from API response:', err);
         throw new Error('Failed to parse summary from API response');
       }
     } else {

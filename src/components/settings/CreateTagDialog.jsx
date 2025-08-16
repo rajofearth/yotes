@@ -1,4 +1,3 @@
-// src/components/settings/CreateTagDialog.jsx
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../ui/dialog';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -7,13 +6,11 @@ import { useEffect } from 'react';
 
 export const CreateTagDialog = ({ open, onOpenChange, tagState, setTagState, handleTagAction }) => {
 
-  // Function to get a random color from colorOptions
   const getRandomColor = () => {
     const randomIndex = Math.floor(Math.random() * colorOptions.length);
     return colorOptions[randomIndex].value;
   };
 
-    //set the tag color when the dialog opens
   useEffect(() => {
     if(open){
         setTagState(prev => ({...prev, newColor: getRandomColor()}));
@@ -35,11 +32,7 @@ export const CreateTagDialog = ({ open, onOpenChange, tagState, setTagState, han
             onChange={e => setTagState(prev => ({ ...prev, newName: e.target.value }))}
             className="w-full bg-overlay/5 border-overlay/10"
           />
-          {/*  Comment out or remove the ColorSelect component */}
-          {/* <ColorSelect
-            value={tagState.newColor}
-            onValueChange={(value) => setTagState((prev) => ({ ...prev, newColor: value }))}
-          /> */}
+          {/* ColorSelect omitted intentionally for now */}
           <div className="flex items-center gap-2">
             <span className="text-sm text-text-primary/60">Preview:</span>
             <span

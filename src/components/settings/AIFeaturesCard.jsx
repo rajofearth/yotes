@@ -119,7 +119,7 @@ export const AIFeaturesCard = ({ aiSettings, onSaveApiKey, onToggleAiFeatures })
                       className="bg-overlay/5 border-overlay/20 focus:border-primary/50"
                     />
                     <p className="text-xs text-text-primary/50">
-                      Your API key will be securely stored in Google Drive, not locally.
+                      Your API key is saved securely to your account.
                     </p>
                   </div>
                   

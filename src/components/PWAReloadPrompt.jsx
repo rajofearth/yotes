@@ -1,19 +1,18 @@
-// src/components/PWAReloadPrompt.jsx
 import React from 'react';
 import { useRegisterSW } from 'virtual:pwa-register/react';
-import { Button } from './ui/button'; // Assuming shadcn button
+import { Button } from './ui/button';
 import { RefreshCw } from 'lucide-react';
-import { useToast } from '../contexts/ToastContext'; // Import useToast
+import { useToast } from '../contexts/ToastContext';
 
 function PWAReloadPrompt() {
-  const showToast = useToast(); // Get the toast function
+  const showToast = useToast(); 
   const {
     offlineReady: [offlineReady, setOfflineReady],
     needRefresh: [needRefresh, setNeedRefresh],
     updateServiceWorker,
   } = useRegisterSW({
     onRegistered(r) {
-      // console.log('SW Registered:', r);
+    
     },
     onRegisterError(error) {
       console.error('SW registration error:', error);

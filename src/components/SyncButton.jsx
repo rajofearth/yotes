@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useNotes } from '../hooks/useNotes';
 import { useOnlineStatus } from '../contexts/OnlineStatusContext';
-import { Loader2, Upload, CheckCircle2, RotateCw } from 'lucide-react';
+import { Loader2, Upload, CheckCircle2 } from 'lucide-react';
 import { useToast } from '../contexts/ToastContext';
 import { openDB } from '../utils/indexedDB';
 import { useMutation, useQuery } from 'convex/react';
@@ -58,13 +58,11 @@ const SyncButton = () => {
 		setComplete(false);
 		setProgress(5);
 		setMessage('Opening local database...');
-		console.log('[Migration] Starting');
 		try {
 			const db = await openDB();
 			setProgress(10); setMessage('Reading local tags and notes...');
 			const tags = await new Promise((resolve) => { const r = db.transaction('tags').objectStore('tags').get('tags_data'); r.onsuccess = () => resolve(r.result?.value || []); r.onerror = () => resolve([]); });
 			const notes = await new Promise((resolve) => { const r = db.transaction('notes').objectStore('notes').get('notes_data'); r.onsuccess = () => resolve(r.result?.value || []); r.onerror = () => resolve([]); });
-			console.log('[Migration] Loaded', { tags: tags?.length || 0, notes: notes?.length || 0 });
 			const total = (tags?.length || 0) + (notes?.length || 0);
 			let done = 0;
 
@@ -83,9 +81,8 @@ const SyncButton = () => {
 						const created = await upsertTag({ userId: convexUserId, name, color });
 						convexTagId = created?._id || created?.id || created;
 						if (convexTagId) nameToId.set(name.toLowerCase(), convexTagId);
-						console.log('[Migration] Tag created', name, convexTagId);
 					} catch (e) {
-						console.warn('[Migration] Tag create error (continuing):', e);
+						// continue
 					}
 				}
 				if (legacyId && convexTagId) legacyIdToConvexId.set(legacyId, convexTagId);
@@ -104,9 +101,8 @@ const SyncButton = () => {
 						content: n?.content || undefined,
 						tags: mappedTags,
 					});
-					console.log('[Migration] Note created', n?.title || n?.id);
 				} catch (e) {
-					console.warn('[Migration] Note create error (continuing):', e);
+					// continue
 				}
 				done++; setProgress(10 + Math.floor((done/Math.max(total,1))*80));
 			}
@@ -114,10 +110,8 @@ const SyncButton = () => {
 			setProgress(100); setMessage('Migration completed');
 			setComplete(true);
 			showToast('Local migration complete', 'success');
-			console.log('[Migration] Completed');
 		} catch (e) {
 			showToast('Migration failed', 'error');
-			console.error('[Migration] Error:', e);
 		} finally {
 			setMigrating(false);
 		}

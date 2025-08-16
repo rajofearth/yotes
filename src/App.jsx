@@ -3,13 +3,10 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { Analytics } from '@vercel/analytics/react';
 import { supabase } from './utils/supabaseClient';
 import { findSupabaseLocalStorageKey } from './hooks/useSettings';
-// GoogleDrive removed; using Convex
 import { ToastProvider, useToast } from './contexts/ToastContext';
 import { NotesProvider, useNotes } from './contexts/NotesContext';
 import { useOnlineStatus } from './contexts/OnlineStatusContext';
 import { OfflineBadge } from './components/OfflineBadge';
-import { SyncTriggerBadge } from './components/SyncTriggerBadge';
-import { SyncProgressOverlay } from './components/SyncProgressOverlay';
 import ViewNote from './pages/note/view/[id]';
 import Home from './pages/home';
 import Login from './pages/login'; 
@@ -130,7 +127,7 @@ function AppContent({ session, isAuthLoading, isInitialLoad, setIsInitialLoad })
       );
     }
     
-    if (hasCriticalError && !isNotesLoading /* Show error only after cache attempt */) {
+    if (hasCriticalError && !isNotesLoading) {
       return (
         <div className="min-h-screen bg-bg-primary flex flex-col items-center justify-center p-4 text-center">
           <h1 className="text-2xl font-semibold text-red-500 mb-4">
@@ -152,12 +149,11 @@ function AppContent({ session, isAuthLoading, isInitialLoad, setIsInitialLoad })
         </div>
       );
     } else {
-      // Show progress bar during cache load OR initial drive check
        return (
          <>
            <ProgressBar
-             progress={loadingState?.progress ?? (isDriveLoading ? 40 : (isNotesLoading ? 15 : 5))}
-             message={loadingState?.message ?? (isDriveLoading ? 'Connecting Drive...' : (isNotesLoading ? 'Loading Notes...' : 'Initializing...'))}
+             progress={loadingState?.progress ?? (isNotesLoading ? 15 : 5)}
+             message={loadingState?.message ?? (isNotesLoading ? 'Loading Notes...' : 'Initializing...')}
            />
            <OfflineBadge />
          </>
@@ -168,10 +164,6 @@ function AppContent({ session, isAuthLoading, isInitialLoad, setIsInitialLoad })
   // --- Initial Load Complete - Show App ---
   return (
     <ErrorBoundary fallback={<div>Something went wrong! Try refreshing.</div>}>
-      <SyncProgressOverlay
-        isSyncing={isManualSyncing}
-        message={syncProgressMessage}
-      />
 
       <Suspense
         fallback={<ProgressBar progress={-1} message="Loading page..." />}
@@ -189,12 +181,6 @@ function AppContent({ session, isAuthLoading, isInitialLoad, setIsInitialLoad })
         </Routes>
       </Suspense>
       <OfflineBadge />
-      <SyncTriggerBadge
-        hasPending={false}
-        onSync={async () => {}}
-        isSyncing={false}
-        syncDiscrepancyDetected={false}
-      />
       <SyncButton />
     </ErrorBoundary>
   );
