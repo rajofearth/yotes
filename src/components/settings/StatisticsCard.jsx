@@ -5,17 +5,19 @@ export const StatisticsCard = ({ notes, tags }) => {
   const totalNotes = notes?.length || 0;
   const totalTags = tags?.length || 0;
   
-  // Calculate the total word count across all notes
   const totalWords = notes?.reduce((acc, note) => {
     const wordCount = note.content?.split(/\s+/).filter(Boolean).length || 0;
     return acc + wordCount;
   }, 0) || 0;
   
-  // Get the last edit date
-  const lastEditDate = notes?.length 
-    ? new Date(Math.max(...notes.map(note => new Date(note.updated_at || note.created_at))))
-    : null;
-    
+  const lastEditTimestamp = (notes || []).reduce((max, note) => {
+    const ts = typeof note?.updatedAt === 'number' ? note.updatedAt
+      : typeof note?.createdAt === 'number' ? note.createdAt
+      : 0;
+    return Math.max(max, ts || 0);
+  }, 0);
+  const lastEditDate = lastEditTimestamp ? new Date(lastEditTimestamp) : null;
+      
   return (
     <Card className="bg-overlay/5 border-overlay/10 h-full min-h-[400px]">
       <CardHeader>

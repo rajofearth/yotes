@@ -159,7 +159,7 @@ export default function Settings() {
                             </Tabs>
                             <div className="hidden md:block bg-overlay/5 rounded-lg p-4 space-y-2">
                                 <h3 className="text-sm font-medium text-text-primary/80">Current Version</h3>
-                                <p className="text-xs text-text-primary/60">Your Notes v0.0.8</p>
+                                <p className="text-xs text-text-primary/60">Yotes v0.0.8</p>
                             </div>
                         </div>
                     </div>
