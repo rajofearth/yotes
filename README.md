@@ -1,16 +1,16 @@
 # Yotes
 
-Yotes is a privacy-first web application designed to empower users with full control over their data. More than just a notes app, Yotes integrates with your Google Drive to securely store and manage notes, documents (like PDFs, Docs, Excel, PPTs), media files, and other digital resources—all without subscription fees, as it leverages your own Google Drive storage. Built with a sleek, dark-themed interface using React and Tailwind CSS, Yotes aims to centralize your resources in one intuitive hub. Check out the live site at [yotes.vercel.app](https://yotes.vercel.app).
+Yotes is a privacy-first notes application with real-time sync powered by Convex and authentication via Supabase. Built with a sleek, dark-themed interface using React and Tailwind CSS, Yotes keeps your notes, tags, and AI settings in your own Convex database with per-user access control. Check out the live site at [yotes.vercel.app](https://yotes.vercel.app).
 
 ## Vision
 
-Yotes prioritizes user privacy by ensuring all data stays within your Google Drive, avoiding third-party storage costs or lock-in. Beyond note-taking, it aspires to be a versatile platform where you can import, view, and organize various file types, embedding rich media like YouTube videos or website previews, and enhancing productivity with AI-powered features—all while remaining lightweight and user-controlled.
+Yotes prioritizes user privacy and control by keeping data in a secure, real-time Convex database per user. Beyond note-taking, it aims to provide fast search, organized tagging, and AI-powered insights while remaining lightweight and user-controlled.
 
 ## Features
 
-- **Privacy-Focused Notes**: Create, edit, and delete notes stored securely in your Google Drive.
-- **Google Drive Integration**: Uses your Drive’s "Yotes App" folder for notes and tags, with plans to support file imports (PDFs, Docs, etc.).
-- **Tagging System**: Categorize notes with customizable tags synced to Drive.
+- **Privacy-Focused Notes**: Create, edit, and delete notes stored securely in Convex with per-user access control.
+- **Real-time Sync**: Notes and tags update instantly across sessions via Convex live queries.
+- **Tagging System**: Categorize notes with customizable tags.
 - **Search & Filter**: Quickly find notes by content or tags.
 - **Activity Heatmap**: Visualize note creation over the past year in the Settings page.
 - **Responsive Design**: Works seamlessly on desktop and mobile.
@@ -43,17 +43,18 @@ From Yashraj’s rough TODO list, here’s what’s in the pipeline:
 
 - **Frontend**: React, React Router, Vite
 - **Styling**: Tailwind CSS, shadcn/ui, Lucide icons
-- **Integration**: Google Drive API, Supabase Auth
-- **Offline & PWA**: IndexedDB (for offline storage), Workbox (for PWA and service worker management)
-- **AI**: Google Gemini API (for AI features)
-- **State Management**: React Contexts (GoogleDriveContext, ToastContext, ThemeContext)
+- **Backend**: Convex (database, server functions, actions)
+- **Auth**: Supabase Auth (Google OAuth)
+- **Offline & PWA**: IndexedDB (local cache for session/migration), Workbox (PWA/service worker)
+- **AI**: Google Gemini API (proxied via Convex actions)
+- **State Management**: React Contexts (NotesContext, ToastContext, ThemeContext)
 - **Build Tools**: Vite, ESLint, PostCSS
 - **Dependencies**: See `package.json`
 
 ## Prerequisites
 
 - Node.js (v18+ recommended)
-- Google account for OAuth and Drive access
+- Google account for OAuth
 - Supabase project with Google OAuth configured
 - `.env` file with Supabase credentials
 
@@ -86,7 +87,7 @@ From Yashraj’s rough TODO list, here’s what’s in the pipeline:
 
 ## Usage
 
-1. **Sign In**: Log in with Google to connect your Drive.
+1. **Sign In**: Log in with Google.
 2. **Create Notes**: Use the "+" button in the navbar to add notes.
 3. **Organize**: Add tags or (soon) import files like PDFs.
 4. **Search & Filter**: Use the search bar or tag filters on the homepage.
@@ -119,5 +120,5 @@ Currently unlicensed; a license will be added as the project evolves.
 ## Acknowledgments
 
 - Created by Yashraj Maher (GitHub: [rajofearth](https://github.com/rajofearth)).
-- Thanks to the React, Tailwind, Supabase, and Google Drive communities.
+- Thanks to the React, Tailwind, Supabase, Convex, and OSS communities.
 
