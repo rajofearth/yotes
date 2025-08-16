@@ -1,228 +1,164 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useNotes } from '../hooks/useNotes';
 import { useOnlineStatus } from '../contexts/OnlineStatusContext';
-import { Loader2, RefreshCw, Upload, Download } from 'lucide-react';
-// Drive/IndexedDB removed with Convex migration
-// import { getSyncQueue } from '../utils/indexedDB';
+import { Loader2, Upload, CheckCircle2, RotateCw } from 'lucide-react';
 import { useToast } from '../contexts/ToastContext';
+import { openDB } from '../utils/indexedDB';
+import { useMutation, useQuery } from 'convex/react';
+import { api } from '../../convex/_generated/api';
 
 const SyncButton = () => {
-  const { 
-    hasPendingChanges, 
-    manualSyncWithDrive, 
-    isManualSyncing,
-    syncProgressMessage,
-    checkSyncDiscrepancies
-  } = useNotes();
-  
-  const isOnline = useOnlineStatus();
-  const showToast = useToast();
-  const [isAnimating, setIsAnimating] = useState(false);
-  const [hasLocalChanges, setHasLocalChanges] = useState(false);
-  const [syncDiscrepancyDetected, setSyncDiscrepancyDetected] = useState(false);
-  const [isCheckingSync, setIsCheckingSync] = useState(false);
-  
-  // Check sync queue directly to confirm changes
-  useEffect(() => {
-    setHasLocalChanges(false);
-  }, []);
-  
-  // Check for sync discrepancies between IndexedDB and Drive
-  useEffect(() => {
-    let cancelled = false;
-    if (!isOnline) {
-      setSyncDiscrepancyDetected(false);
-      return;
-    }
-    
-    const checkDiscrepanciesLoop = async () => {
-      if (isManualSyncing) return; // Skip check if already syncing
-      
-      try {
-        // Force deep check via hook
-        const syncNeeded = await checkSyncDiscrepancies(true);
-        if (!cancelled) setSyncDiscrepancyDetected(syncNeeded);
-        console.log('[SyncButton] Discrepancy check result:', syncNeeded);
-      } catch (err) {
-        console.error("Error checking sync discrepancies:", err);
-      }
-    };
-    
-    checkDiscrepanciesLoop();
-    const interval = setInterval(checkDiscrepanciesLoop, 5000);
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-    };
-  }, [isOnline, isManualSyncing, checkSyncDiscrepancies]);
-  
-  // Add animation effect when changes are pending
-  useEffect(() => {
-    if (hasPendingChanges || hasLocalChanges || syncDiscrepancyDetected) {
-      setIsAnimating(true);
-      const timer = setTimeout(() => setIsAnimating(false), 2000);
-      return () => clearTimeout(timer);
-    }
-  }, [hasPendingChanges, hasLocalChanges, syncDiscrepancyDetected]);
+	const isOnline = useOnlineStatus();
+	const { convexUserId } = useNotes();
+	const showToast = useToast();
+	const [isAnimating, setIsAnimating] = useState(false);
+	const [hasLocalYotes, setHasLocalYotes] = useState(false);
+	const [migrating, setMigrating] = useState(false);
+	const [complete, setComplete] = useState(false);
+	const [progress, setProgress] = useState(0);
+	const [message, setMessage] = useState('');
 
-  // Handle manual sync based on what type of changes we have, and clear pull indicator when done
-  const handleSync = async () => {
-    // Just call manualSyncWithDrive directly - it will handle both push and pull operations
-    await manualSyncWithDrive();
-    // After syncing, hide pull button immediately
-    setSyncDiscrepancyDetected(false);
-  };
+	const upsertTag = useMutation(api.tags.create);
+	const upsertNote = useMutation(api.notes.create);
+	const existingTags = useQuery(api.tags.list, convexUserId ? { userId: convexUserId } : 'skip');
+	const existingTagMap = useMemo(() => {
+		if (!Array.isArray(existingTags)) return new Map();
+		const m = new Map();
+		for (const t of existingTags) {
+			if (t?.name) m.set(String(t.name).toLowerCase(), t._id);
+		}
+		return m;
+	}, [existingTags]);
 
-  // Manually check for sync discrepancies
-  const handleForceCheck = async (e) => {
-    e.stopPropagation();
-    if (!isOnline || isCheckingSync || isManualSyncing) {
-      return;
-    }
-    
-    setIsCheckingSync(true);
-    try {
-      showToast('Checking for remote changes...', 'info');
-      
-      // Deep check for discrepancies via hook
-      const syncNeeded = await checkSyncDiscrepancies(true);
-      setSyncDiscrepancyDetected(syncNeeded);
-      console.log('[SyncButton] Manual check result:', syncNeeded);
-      
-      if (syncNeeded) {
-        showToast('Found changes from other devices!', 'success');
-      } else {
-        showToast('No new changes found', 'info');
-      }
-    } catch (err) {
-      console.error("Error during manual sync check:", err);
-      showToast('Error checking for changes', 'error');
-    } finally {
-      setIsCheckingSync(false);
-    }
-  };
-  
-  // Show spinner when syncing
-  if (isManualSyncing) {
-    return (
-      <div
-        className="fixed bottom-24 right-4 z-50 
-          bg-bg-primary text-text-primary/80
-          rounded-full p-4 shadow-lg 
-          flex items-center gap-2
-          ring-1 ring-overlay/20"
-        title={syncProgressMessage || "Syncing with Google Drive..."}
-        role="status"
-        aria-label="Syncing with Google Drive"
-      >
-        <Loader2 className="h-5 w-5 text-blue-400 animate-spin" />
-        <span className="text-xs whitespace-nowrap pr-1 max-w-[120px] overflow-hidden text-ellipsis">
-          {syncProgressMessage ? syncProgressMessage.substring(0, 20) : "Syncing..."}
-        </span>
-      </div>
-    );
-  }
-  
-  // Determine what button to show (only one at a time)
-  const hasLocalOnly = (hasPendingChanges || hasLocalChanges) && !syncDiscrepancyDetected;
-  const hasRemoteOnly = !hasLocalOnly && syncDiscrepancyDetected;
-  const noChangeDetected = !hasLocalOnly && !hasRemoteOnly && !isCheckingSync;
-  
-  // If there are local changes to upload (takes priority)
-  if (hasLocalOnly) {
-    return (
-      <button 
-        onClick={handleSync}
-        disabled={!isOnline}
-        className={`
-          fixed bottom-24 right-4 z-50
-          bg-bg-primary text-text-primary 
-          hover:bg-overlay/10 
-          rounded-full p-4 shadow-lg 
-          flex items-center justify-center 
-          transition-all duration-300 
-          ring-1 ring-overlay/20
-          ${isAnimating ? 'animate-pulse' : ''} 
-          disabled:opacity-50 disabled:pointer-events-none
-        `}
-        title={isOnline ? "Push local changes to Google Drive" : "Connect to internet to sync"}
-      >
-        <Upload className="h-5 w-5 text-gray-400" />
-        <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-5 h-5 flex items-center justify-center rounded-full">
-          !
-        </span>
-      </button>
-    );
-  }
-  
-  // If there are remote changes to download
-  if (hasRemoteOnly && isOnline) {
-    return (
-      <button 
-        onClick={handleSync}
-        className={`
-          fixed bottom-24 right-4 z-50
-          bg-bg-primary text-text-primary 
-          hover:bg-overlay/10 
-          rounded-full p-4 shadow-lg 
-          flex items-center justify-center 
-          transition-all duration-300 
-          ring-1 ring-overlay/20
-          ${isAnimating ? 'animate-pulse' : ''} 
-        `}
-        title="Pull updates from Google Drive"
-      >
-        <Download className="h-5 w-5 text-yellow-400" />
-        <span className="absolute -top-1 -right-1 bg-yellow-500 text-white text-xs w-5 h-5 flex items-center justify-center rounded-full">
-          !
-        </span>
-      </button>
-    );
-  }
-  
-  // If manually checking for changes
-  if (isCheckingSync) {
-    return (
-      <button 
-        disabled={true}
-        className={`
-          fixed bottom-24 right-4 z-50
-          bg-bg-primary text-text-primary 
-          rounded-full p-4 shadow-lg 
-          flex items-center justify-center 
-          transition-all duration-300 
-          ring-1 ring-overlay/20
-        `}
-        title="Checking for changes..."
-      >
-        <Loader2 className="h-5 w-5 text-blue-400 animate-spin" />
-      </button>
-    );
-  }
-  
-  // Default - show refresh button when online
-  if (isOnline) {
-    return (
-      <button 
-        onClick={handleForceCheck}
-        className={`
-          fixed bottom-24 right-4 z-50
-          bg-bg-primary text-text-primary 
-          hover:bg-overlay/10 
-          rounded-full p-3 shadow-lg 
-          flex items-center justify-center 
-          transition-all duration-300 
-          ring-1 ring-overlay/20
-        `}
-        title="Check for changes from other devices"
-      >
-        <RefreshCw className="h-4 w-4 text-gray-400" />
-      </button>
-    );
-  }
-  
-  // No button to show
-  return null;
+	// Detect legacy YotesDB (IndexedDB) presence
+	useEffect(() => {
+		let cancelled = false;
+		const check = async () => {
+			try { await openDB(); if (!cancelled) setHasLocalYotes(true); }
+			catch { if (!cancelled) setHasLocalYotes(false); }
+		};
+		check();
+		return () => { cancelled = true; };
+	}, []);
+
+	useEffect(() => {
+		if (hasLocalYotes) {
+			setIsAnimating(true);
+			const t = setTimeout(() => setIsAnimating(false), 1500);
+			return () => clearTimeout(t);
+		}
+	}, [hasLocalYotes]);
+
+	const migrate = async () => {
+		if (migrating) return;
+		if (!isOnline) { showToast('Connect to the internet to migrate.', 'info'); return; }
+		if (!convexUserId) { showToast('Please wait, preparing your account...', 'info'); return; }
+		setMigrating(true);
+		setComplete(false);
+		setProgress(5);
+		setMessage('Opening local database...');
+		console.log('[Migration] Starting');
+		try {
+			const db = await openDB();
+			setProgress(10); setMessage('Reading local tags and notes...');
+			const tags = await new Promise((resolve) => { const r = db.transaction('tags').objectStore('tags').get('tags_data'); r.onsuccess = () => resolve(r.result?.value || []); r.onerror = () => resolve([]); });
+			const notes = await new Promise((resolve) => { const r = db.transaction('notes').objectStore('notes').get('notes_data'); r.onsuccess = () => resolve(r.result?.value || []); r.onerror = () => resolve([]); });
+			console.log('[Migration] Loaded', { tags: tags?.length || 0, notes: notes?.length || 0 });
+			const total = (tags?.length || 0) + (notes?.length || 0);
+			let done = 0;
+
+			// Build mapping from legacy tag id and name to Convex tag Id
+			const nameToId = new Map(existingTagMap);
+			const legacyIdToConvexId = new Map();
+
+			setMessage(`Migrating ${tags.length} tags...`);
+			for (const t of tags) {
+				const legacyId = t?.id || t?.uuid || t?.name;
+				const name = String(t?.name || '').trim();
+				const color = t?.color || 'bg-gray-500/20 text-gray-500';
+				let convexTagId = name ? nameToId.get(name.toLowerCase()) : undefined;
+				if (!convexTagId && name) {
+					try {
+						const created = await upsertTag({ userId: convexUserId, name, color });
+						convexTagId = created?._id || created?.id || created;
+						if (convexTagId) nameToId.set(name.toLowerCase(), convexTagId);
+						console.log('[Migration] Tag created', name, convexTagId);
+					} catch (e) {
+						console.warn('[Migration] Tag create error (continuing):', e);
+					}
+				}
+				if (legacyId && convexTagId) legacyIdToConvexId.set(legacyId, convexTagId);
+				done++; setProgress(10 + Math.floor((done/Math.max(total,1))*80));
+			}
+
+			setMessage(`Migrating ${notes.length} notes...`);
+			for (const n of notes) {
+				const legacyTags = Array.isArray(n?.tags) ? n.tags : [];
+				const mappedTags = legacyTags.map((lt) => legacyIdToConvexId.get(lt)).filter(Boolean);
+				try {
+					await upsertNote({
+						userId: convexUserId,
+						title: n?.title || undefined,
+						description: n?.description || undefined,
+						content: n?.content || undefined,
+						tags: mappedTags,
+					});
+					console.log('[Migration] Note created', n?.title || n?.id);
+				} catch (e) {
+					console.warn('[Migration] Note create error (continuing):', e);
+				}
+				done++; setProgress(10 + Math.floor((done/Math.max(total,1))*80));
+			}
+
+			setProgress(100); setMessage('Migration completed');
+			setComplete(true);
+			showToast('Local migration complete', 'success');
+			console.log('[Migration] Completed');
+		} catch (e) {
+			showToast('Migration failed', 'error');
+			console.error('[Migration] Error:', e);
+		} finally {
+			setMigrating(false);
+		}
+	};
+
+	// UI states
+	if (migrating) {
+		return (
+			<div className="fixed bottom-24 right-4 z-50 bg-bg-primary text-text-primary/80 rounded-full p-4 shadow-lg flex items-center gap-2 ring-1 ring-overlay/20" title={message || 'Migrating...'} role="status" aria-label="Migrating data">
+				<Loader2 className="h-5 w-5 text-blue-400 animate-spin" />
+				<span className="text-xs whitespace-nowrap pr-1 max-w-[180px] overflow-hidden text-ellipsis">{message ? message.substring(0, 40) : 'Migrating...'}</span>
+				<span className="text-[10px] text-text-primary/50">{progress}%</span>
+			</div>
+		);
+	}
+
+	if (complete && isOnline) {
+		return (
+			<button onClick={migrate} className={`fixed bottom-24 right-4 z-50 bg-bg-primary text-text-primary hover:bg-overlay/10 rounded-full p-4 shadow-lg flex items-center justify-center transition-all duration-300 ring-1 ring-overlay/20 ${isAnimating ? 'animate-pulse' : ''}`} title="Migration complete. Click to run again if needed.">
+				<CheckCircle2 className="h-5 w-5 text-green-500" />
+			</button>
+		);
+	}
+
+	if (isOnline && hasLocalYotes) {
+		return (
+			<button onClick={migrate} disabled={!isOnline} className={`fixed bottom-24 right-4 z-50 bg-bg-primary text-text-primary hover:bg-overlay/10 rounded-full p-4 shadow-lg flex items-center justify-center transition-all duration-300 ring-1 ring-overlay/20 ${isAnimating ? 'animate-pulse' : ''} disabled:opacity-50 disabled:pointer-events-none`} title={isOnline ? 'Migrate your local data to Convex' : 'Connect to internet to migrate'}>
+				<Upload className="h-5 w-5 text-gray-400" />
+				<span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-5 h-5 flex items-center justify-center rounded-full">!</span>
+			</button>
+		);
+	}
+
+	if (isOnline && !hasLocalYotes && !complete) {
+		return (
+			<button onClick={migrate} className={`fixed bottom-24 right-4 z-50 bg-bg-primary text-text-primary hover:bg-overlay/10 rounded-full p-3 shadow-lg flex items-center justify-center transition-all duration-300 ring-1 ring-overlay/20`} title="Migrate local data to Convex">
+				<RotateCw className="h-4 w-4 text-gray-400" />
+			</button>
+		);
+	}
+
+	return null;
 };
 
 export default SyncButton; 

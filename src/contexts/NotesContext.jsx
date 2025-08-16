@@ -30,10 +30,10 @@ export function NotesProvider({ children, session }) {
 
     // Remove IndexedDB/Drive: live Convex data subscription
     useEffect(() => {
-        if (!session) {
-            setIsLoading(false);
-            return;
-        }
+            if (!session) {
+                setIsLoading(false);
+                return;
+            }
         (async () => {
             try {
                 setLoadingState({ progress: 40, message: 'Connecting to Convex...' });
@@ -118,6 +118,7 @@ export function NotesProvider({ children, session }) {
             isSyncing,
             isInitialSync,
             loadingState,
+            convexUserId,
             createNote,
             deleteNote,
             updateNote,
