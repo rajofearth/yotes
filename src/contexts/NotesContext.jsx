@@ -36,10 +36,10 @@ export function NotesProvider({ children, session }) {
     const deleteTagMutation = useMutation(api.tags.remove);
 
     useEffect(() => {
-        if (!session) {
-            setIsLoading(false);
-            return;
-        }
+            if (!session) {
+                setIsLoading(false);
+                return;
+            }
         (async () => {
             try {
                 setLoadingState({ progress: 40, message: 'Connecting to Convex...' });
@@ -146,8 +146,8 @@ export function NotesProvider({ children, session }) {
                         if (t?.colorEnc?.ct && t?.colorEnc?.iv) color = await decryptString(dekRef.current, t.colorEnc);
                     } catch {}
                     return { ...t, id: t._id, name, color };
-                }));
-                setTags(normalizedTags);
+            }));
+            setTags(normalizedTags);
             })();
         }
 
@@ -167,11 +167,11 @@ export function NotesProvider({ children, session }) {
             (async () => {
                 const decrypted = await Promise.all(listNotes.map(decryptIfPossible));
                 const normalizedNotes = decrypted.map((n) => ({
-                    ...n,
-                    id: n._id,
-                    tags: Array.isArray(n.tags) ? n.tags.map((tid) => String(tid)) : [],
-                }));
-                setNotes(normalizedNotes);
+                ...n,
+                id: n._id,
+                tags: Array.isArray(n.tags) ? n.tags.map((tid) => String(tid)) : [],
+            }));
+            setNotes(normalizedNotes);
             })();
         }
 

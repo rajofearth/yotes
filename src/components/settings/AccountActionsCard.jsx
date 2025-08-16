@@ -2,7 +2,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '../ui/card';
 import { Button } from '../ui/button';
 import { LogOut, AlertTriangle, DownloadCloud, Shield } from 'lucide-react';
 
-export const AccountActionsCard = ({ loading, handleLogout, handleDeleteAccount, setDialogs }) => (
+export const AccountActionsCard = ({ loading, handleLogout, handleDeleteAccount, setDialogs, onExport }) => (
   <Card className="bg-overlay/5 border-overlay/10">
     <CardHeader>
       <CardTitle className="flex items-center gap-2">
@@ -18,6 +18,7 @@ export const AccountActionsCard = ({ loading, handleLogout, handleDeleteAccount,
           variant="outline" 
           className="mt-2 w-full sm:w-auto flex items-center gap-2 bg-overlay/5"
           disabled={loading?.logout || loading?.delete}
+          onClick={onExport}
         >
           <DownloadCloud className="h-4 w-4" />
           Export Data

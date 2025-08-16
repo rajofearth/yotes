@@ -10,10 +10,9 @@ export const getSettings = query({
       .withIndex("byUser", (q) => q.eq("userId", userId))
       .unique();
     if (!existing) return { enabled: false, apiKey: null };
-    // Do not leak raw API key to client; return masked placeholder
     return {
       enabled: existing.enabled,
-      apiKey: existing.apiKey ? "••••••" : null,
+      apiKey: (existing as any).apiKey || (existing as any).apiKeyEnc ? "••••••" : null,
     };
   },
 });
@@ -23,8 +22,9 @@ export const saveSettings = mutation({
     userId: v.id("users"),
     enabled: v.optional(v.boolean()),
     apiKey: v.optional(v.union(v.string(), v.null())),
+    apiKeyEnc: v.optional(v.object({ ct: v.string(), iv: v.string() })),
   },
-  handler: async (ctx, { userId, enabled, apiKey }) => {
+  handler: async (ctx, { userId, enabled, apiKey, apiKeyEnc }) => {
     const existing = await ctx.db
       .query("aiSettings")
       .withIndex("byUser", (q) => q.eq("userId", userId))
@@ -35,7 +35,7 @@ export const saveSettings = mutation({
         userId,
         provider: "gemini",
         enabled: enabled ?? false,
-        apiKey: apiKey ?? null,
+        apiKeyEnc: apiKeyEnc ?? undefined,
         createdAt: now,
         updatedAt: now,
       });
@@ -43,10 +43,22 @@ export const saveSettings = mutation({
     }
     await ctx.db.patch(existing._id, {
       enabled: enabled ?? existing.enabled,
-      apiKey: apiKey === undefined ? existing.apiKey : apiKey,
+      apiKeyEnc: apiKeyEnc === undefined ? (existing as any).apiKeyEnc : apiKeyEnc,
       updatedAt: now,
     });
     return { ok: true };
+  },
+});
+
+export const getSettingsRaw = query({
+  args: { userId: v.id("users") },
+  handler: async (ctx, { userId }) => {
+    const existing = await ctx.db
+      .query("aiSettings")
+      .withIndex("byUser", (q) => q.eq("userId", userId))
+      .unique();
+    if (!existing) return null;
+    return { enabled: existing.enabled, apiKeyEnc: (existing as any).apiKeyEnc ?? undefined };
   },
 });
 
