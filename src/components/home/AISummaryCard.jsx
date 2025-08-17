@@ -38,6 +38,11 @@ export const AISummaryCard = ({
     try {
       const summaryData = await generateSearchSummary(notes, searchQuery, convexUserId);
       setSummary(summaryData);
+      if (summaryData && summaryData._cached && !window.__yotesCacheToastShown) {
+        window.__yotesCacheToastShown = true;
+        showToast('Showing cached AI summary', 'info');
+        setTimeout(() => { window.__yotesCacheToastShown = false; }, 1500);
+      }
     } catch (err) {
       console.error('Failed to generate summary:', err);
       setError(err.message || 'Failed to generate summary');

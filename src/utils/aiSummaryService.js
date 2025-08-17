@@ -55,6 +55,8 @@ export const generateSearchSummary = async (searchResults, searchQuery, userId) 
     if (cached?.summaryEnc?.ct && cached?.summaryEnc?.iv) {
       const json = await decryptString(dek, cached.summaryEnc);
       const parsed = JSON.parse(json);
+      // Mark as cached for UI acknowledgement
+      parsed._cached = true;
       return parsed;
     }
   } catch {}
