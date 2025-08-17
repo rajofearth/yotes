@@ -105,8 +105,8 @@ function AppContent({ session, isAuthLoading, isInitialLoad, setIsInitialLoad })
     );
   }
 
-  // Logged In: Show Initial Loading / Error / App
-  if (isInitialLoad || isNotesLoading /* Also check isNotesLoading for cache phase */) {
+  // Logged In: Show Initial Loading / Error / App (only during initial load)
+  if (isInitialLoad) {
     const hasCriticalError = driveError || notesError;
     
     // Immediately exit loading state when offline
@@ -153,8 +153,8 @@ function AppContent({ session, isAuthLoading, isInitialLoad, setIsInitialLoad })
        return (
          <>
            <ProgressBar
-             progress={loadingState?.progress ?? (isNotesLoading ? 15 : 5)}
-             message={loadingState?.message ?? (isNotesLoading ? 'Loading Notes...' : 'Initializing...')}
+             progress={loadingState?.progress ?? 5}
+             message={loadingState?.message ?? 'Initializing...'}
            />
            <OfflineBadge />
          </>
