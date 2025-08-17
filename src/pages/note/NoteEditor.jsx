@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useNotes } from '../../hooks/useNotes';
 import { useToast } from '../../contexts/ToastContext';
@@ -34,6 +34,7 @@ export default function NoteEditor() {
   // Ref to ensure image data is applied only once
   const appliedImageData = useRef(false);
   const imageInFlightRef = useRef(false);
+  const draftKey = useMemo(() => (convexUserId ? `note_draft_${convexUserId}` : 'note_draft'), [convexUserId]);
   
   // Handle importing note fields from an image (moved up and using useCallback)
   const handleImportImage = useCallback(async (file) => {
@@ -92,10 +93,10 @@ export default function NoteEditor() {
     }
   }, [location.state, isCreate, navigate, handleImportImage]);
   
-  // Load draft from localStorage when creating a new note
+  // Load draft from localStorage when creating a new note (per-user)
   useEffect(() => {
     if (isCreate) {
-      const draftNote = localStorage.getItem('note_draft');
+      const draftNote = localStorage.getItem(draftKey);
       if (draftNote) {
         try {
           const parsedDraft = JSON.parse(draftNote);
@@ -105,7 +106,7 @@ export default function NoteEditor() {
         }
       }
     }
-  }, [isCreate]);
+  }, [isCreate, draftKey]);
 
   useEffect(() => {
     if (noteId && !isNotesLoading) { // Wait for notes to load
@@ -124,12 +125,18 @@ export default function NoteEditor() {
     }
   }, [noteId, notes, isNotesLoading, navigate, showToast, isCreate]);
 
-  // Save draft to localStorage when note changes
+  // Debounced autosave draft to localStorage when note changes (per-user)
   useEffect(() => {
-    if (isCreate) {
-      localStorage.setItem('note_draft', JSON.stringify(note));
-    }
-  }, [note, isCreate]);
+    if (!isCreate) return;
+    const timer = setTimeout(() => {
+      try {
+        localStorage.setItem(draftKey, JSON.stringify(note));
+      } catch (e) {
+        // Ignore storage errors
+      }
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [note, isCreate, draftKey]);
 
   // Focus title input on initial mount
   useEffect(() => {
@@ -207,7 +214,7 @@ export default function NoteEditor() {
         setHasChanges(false); // Reset after save
         showToast('Note created successfully', 'success');
         // Clear draft after successful save
-        localStorage.removeItem('note_draft');
+        localStorage.removeItem(draftKey);
         navigate('/', { state: { resetFilters: true, refresh: true } });
       } else {
         await updateNote(noteId, { ...note, updatedAt: now.toISOString() });

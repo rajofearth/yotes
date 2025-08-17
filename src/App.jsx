@@ -167,7 +167,7 @@ function AppContent({ session, isAuthLoading, isInitialLoad, setIsInitialLoad })
     <ErrorBoundary fallback={<div>Something went wrong! Try refreshing.</div>}>
 
       <Suspense
-        fallback={<ProgressBar progress={-1} message="Loading page..." />}
+        fallback={null}
       >
         <AutoBackupWatcher session={session} />
         <Routes>
