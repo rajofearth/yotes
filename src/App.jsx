@@ -229,18 +229,16 @@ function App() {
       setSession(newSession);
       setIsAuthLoading(false); // Auth state confirmed
 
-      if (event === 'SIGNED_IN' && !wasAuth) setIsInitialLoad(true); // Start load sequence
-      else if (event === 'SIGNED_OUT') setIsInitialLoad(false); // Stop load sequence
-      else if (event === 'TOKEN_REFRESH_FAILED') {
+      if (event === 'SIGNED_IN' && !wasAuth) {
+        // Start load sequence only on first sign-in transition
+        setIsInitialLoad(true);
+      } else if (event === 'SIGNED_OUT') {
+        setIsInitialLoad(false); // Stop load sequence on sign-out
+      } else if (event === 'TOKEN_REFRESH_FAILED') {
         console.warn('Supabase token refresh failed, you might need to re-login');
         // Optionally handle this case (could redirect to login)
       }
-      else if ((event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') && isAuth && !wasAuth && !isInitialLoad) {
-          // Handles cases where auth is confirmed after initial getSession check maybe failed
-          setIsInitialLoad(true);
-      } else if (!isAuth) {
-          setIsInitialLoad(false); // Ensure false if not authenticated
-      }
+      // else ignore other events to avoid re-triggering global loading UI
     });
 
     return () => { mounted = false; subscription?.unsubscribe(); };

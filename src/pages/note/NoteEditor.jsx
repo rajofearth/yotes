@@ -35,6 +35,7 @@ export default function NoteEditor() {
   const appliedImageData = useRef(false);
   const imageInFlightRef = useRef(false);
   const draftKey = useMemo(() => (convexUserId ? `note_draft_${convexUserId}` : 'note_draft'), [convexUserId]);
+  const initialNoteLoadedRef = useRef(false);
   
   // Handle importing note fields from an image (moved up and using useCallback)
   const handleImportImage = useCallback(async (file) => {
@@ -111,19 +112,30 @@ export default function NoteEditor() {
   useEffect(() => {
     if (noteId && !isNotesLoading) { // Wait for notes to load
       const existingNote = notes.find(n => n.id === noteId);
-      if (existingNote) {
-        setNote(existingNote);
-        setLastSaved(new Date(existingNote.updatedAt || existingNote.createdAt));
-      } else if (!isNotesLoading) {
-        // Note not found, redirect to home
+      if (!existingNote) {
         showToast('Note not found', 'error');
         navigate('/', { replace: true });
         return;
       }
-    } else if (isCreate) {
-      // Use state as is - we've already loaded from draft if available
+
+      const serverUpdatedAt = new Date(existingNote.updatedAt || existingNote.createdAt);
+
+      // First hydration from server
+      if (!initialNoteLoadedRef.current) {
+        setNote(existingNote);
+        setLastSaved(serverUpdatedAt);
+        initialNoteLoadedRef.current = true;
+        return;
+      }
+
+      // Subsequent updates: only pull from server if not dirty and newer on server
+      if (!hasChanges && (!lastSaved || serverUpdatedAt > lastSaved)) {
+        setNote(existingNote);
+        setLastSaved(serverUpdatedAt);
+      }
     }
-  }, [noteId, notes, isNotesLoading, navigate, showToast, isCreate]);
+    // For create mode, we've already loaded from draft if available
+  }, [noteId, notes, isNotesLoading, navigate, showToast, isCreate, hasChanges, lastSaved]);
 
   // Debounced autosave draft to localStorage when note changes (per-user)
   useEffect(() => {
