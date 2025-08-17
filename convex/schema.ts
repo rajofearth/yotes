@@ -67,7 +67,7 @@ export default defineSchema({
   aiSummaries: defineTable({
     userId: v.id("users"),
     cacheKey: v.string(),
-    summary: v.any(),
+    summaryEnc: v.object({ ct: v.string(), iv: v.string() }),
     createdAt: v.number(),
     expiresAt: v.optional(v.number()),
   })

@@ -1,8 +1,8 @@
 import { getAISettings } from './aiSummaryService';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { generateText } from 'ai';
+import { z } from 'zod';
 
-// Generate note fields from image using Gemini 2.5 Flash
 export const generateNoteFromImage = async (file, userId) => {
   const aiSettings = await getAISettings(userId);
   if (!aiSettings || !aiSettings.enabled || !aiSettings.apiKey) {
@@ -50,10 +50,14 @@ export const generateNoteFromImage = async (file, userId) => {
       };
     }
 
-    const noteFields = JSON.parse(jsonMatch[0]);
-    if (!noteFields.title || !noteFields.description || !noteFields.content) {
-      throw new Error('AI response missing required fields');
-    }
+    const parsed = JSON.parse(jsonMatch[0]);
+    // Validate structured output using Zod
+    const NoteSchema = z.object({
+      title: z.string().min(1).max(160),
+      description: z.string().min(1).max(600),
+      content: z.string().min(1),
+    });
+    const noteFields = NoteSchema.parse(parsed);
     return noteFields;
   } catch (error) {
     throw new Error(error.message || 'Failed to process image');

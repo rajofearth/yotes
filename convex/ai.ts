@@ -62,4 +62,38 @@ export const getSettingsRaw = query({
   },
 });
 
+export const getSummaryCache = query({
+  args: { userId: v.id("users"), cacheKey: v.string() },
+  handler: async (ctx, { userId, cacheKey }) => {
+    const row = await ctx.db
+      .query("aiSummaries")
+      .withIndex("byUserCacheKey", (q) => q.eq("userId", userId).eq("cacheKey", cacheKey))
+      .unique();
+    if (!row) return null;
+    if (row.expiresAt && row.expiresAt < Date.now()) return null;
+    return { summaryEnc: (row as any).summaryEnc, createdAt: row.createdAt, expiresAt: row.expiresAt };
+  },
+});
 
+export const putSummaryCache = mutation({
+  args: {
+    userId: v.id("users"),
+    cacheKey: v.string(),
+    summaryEnc: v.object({ ct: v.string(), iv: v.string() }),
+    ttlSeconds: v.optional(v.number()),
+  },
+  handler: async (ctx, { userId, cacheKey, summaryEnc, ttlSeconds }) => {
+    const now = Date.now();
+    const expiresAt = ttlSeconds ? now + ttlSeconds * 1000 : undefined;
+    const existing = await ctx.db
+      .query("aiSummaries")
+      .withIndex("byUserCacheKey", (q) => q.eq("userId", userId).eq("cacheKey", cacheKey))
+      .unique();
+    if (existing) {
+      await ctx.db.patch(existing._id, { summaryEnc, createdAt: now, expiresAt });
+      return { ok: true };
+    }
+    await ctx.db.insert("aiSummaries", { userId, cacheKey, summaryEnc, createdAt: now, expiresAt });
+    return { ok: true };
+  },
+});
