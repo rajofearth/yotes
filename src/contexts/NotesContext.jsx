@@ -3,6 +3,7 @@ import { useOnlineStatus } from './OnlineStatusContext';
 import { useConvex, useQuery, useMutation } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { deriveKekFromPassphrase, unwrapDek, generateDek, wrapDek, encryptString, decryptString, generateSaltB64 } from '../lib/e2ee';
+import { getFromDB, setInDB } from '../utils/indexedDB';
 import { PassphraseModal } from '../components/PassphraseModal';
 
 export const NotesContext = createContext();
@@ -53,48 +54,58 @@ export function NotesProvider({ children, session }) {
                 setLoadingState({ progress: 60, message: 'Preparing encryption...' });
 
                 const userDoc = await convex.query(api.users.byExternalId, { externalId: session.user.id });
-                const storedPassphrase = sessionStorage.getItem('yotes_passphrase');
 
-                if (userDoc?.wrappedDekB64 && userDoc?.wrappedDekIvB64 && userDoc?.encSaltB64 && userDoc?.encIterations) {
-                    if (storedPassphrase) {
-                        try {
-                            const kek = await deriveKekFromPassphrase(storedPassphrase, userDoc.encSaltB64, userDoc.encIterations);
-                            const dek = await unwrapDek(userDoc.wrappedDekB64, userDoc.wrappedDekIvB64, kek);
-                            dekRef.current = dek; 
-                            e2eeReadyRef.current = true;
-                            setIsE2EEReady(true);
-                            window.__yotesDek = dekRef.current;
-                        } catch {
-                            sessionStorage.removeItem('yotes_passphrase');
-                            setShowPassphraseModal(true);
-                            setIsFirstTimeSetup(false);
-                            setPassphraseCallback(() => async (passphrase) => {
-                                const kek = await deriveKekFromPassphrase(passphrase, userDoc.encSaltB64, userDoc.encIterations);
-                                const dek = await unwrapDek(userDoc.wrappedDekB64, userDoc.wrappedDekIvB64, kek);
-                                dekRef.current = dek; 
-                                e2eeReadyRef.current = true;
-                                setIsE2EEReady(true);
-                                sessionStorage.setItem('yotes_passphrase', passphrase);
-                                window.__yotesDek = dekRef.current;
-                                setShowPassphraseModal(false);
-                            });
-                            return;
-                        }
-                    } else {
-                        setShowPassphraseModal(true);
-                        setIsFirstTimeSetup(false);
-                        setPassphraseCallback(() => async (passphrase) => {
-                            const kek = await deriveKekFromPassphrase(passphrase, userDoc.encSaltB64, userDoc.encIterations);
-                            const dek = await unwrapDek(userDoc.wrappedDekB64, userDoc.wrappedDekIvB64, kek);
-                            dekRef.current = dek; 
-                            e2eeReadyRef.current = true;
-                            setIsE2EEReady(true);
-                            sessionStorage.setItem('yotes_passphrase', passphrase);
-                            window.__yotesDek = dekRef.current;
-                            setShowPassphraseModal(false);
-                        });
+                // Try local device unlock first (uses IndexedDB JWK + locally wrapped DEK)
+                try {
+                    const localJwk = await getFromDB('sessions', 'local_wrap_jwk');
+                    const localWrapped = await getFromDB('sessions', 'local_wrapped_dek');
+                    const localSentinel = await getFromDB('sessions', 'local_dek_sentinel');
+                    if (localJwk && localWrapped?.wrappedDekB64 && localWrapped?.wrappedIvB64) {
+                        const localWrapKey = await crypto.subtle.importKey(
+                            'jwk', localJwk, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']
+                        );
+                        const dek = await unwrapDek(localWrapped.wrappedDekB64, localWrapped.wrappedIvB64, localWrapKey);
+                        // Verify DEK belongs to this user by decrypting sentinel
+                        if (!localSentinel?.ct || !localSentinel?.iv) throw new Error('Missing local sentinel');
+                        const sentinelExpected = `yotes_sentinel:${id}`;
+                        const sentinelPlain = await decryptString(dek, localSentinel);
+                        if (sentinelPlain !== sentinelExpected) throw new Error('Sentinel mismatch');
+                        dekRef.current = dek; e2eeReadyRef.current = true; setIsE2EEReady(true); window.__yotesDek = dekRef.current;
+                        setLoadingState({ progress: 80, message: 'Loading data...' });
                         return;
                     }
+                } catch {}
+
+                if (userDoc?.wrappedDekB64 && userDoc?.wrappedDekIvB64 && userDoc?.encSaltB64 && userDoc?.encIterations) {
+                    setShowPassphraseModal(true);
+                    setIsFirstTimeSetup(false);
+                    setPassphraseCallback(() => async (passphrase) => {
+                        const kek = await deriveKekFromPassphrase(passphrase, userDoc.encSaltB64, userDoc.encIterations);
+                        const dek = await unwrapDek(userDoc.wrappedDekB64, userDoc.wrappedDekIvB64, kek);
+                        dekRef.current = dek; 
+                        e2eeReadyRef.current = true;
+                        setIsE2EEReady(true);
+                        window.__yotesDek = dekRef.current;
+                        // Store local wrapped DEK with device key to avoid re-prompt next time
+                        try {
+                            let localJwk = await getFromDB('sessions', 'local_wrap_jwk');
+                            let localWrapKey;
+                            if (!localJwk) {
+                                localWrapKey = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
+                                localJwk = await crypto.subtle.exportKey('jwk', localWrapKey);
+                                await setInDB('sessions', 'local_wrap_jwk', localJwk);
+                            } else {
+                                localWrapKey = await crypto.subtle.importKey('jwk', localJwk, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+                            }
+                            const { wrappedDekB64, wrappedIvB64 } = await wrapDek(dekRef.current, localWrapKey);
+                            await setInDB('sessions', 'local_wrapped_dek', { wrappedDekB64, wrappedIvB64 });
+                            const sentinelExpected = `yotes_sentinel:${id}`;
+                            const sentinelEnc = await encryptString(dekRef.current, sentinelExpected);
+                            await setInDB('sessions', 'local_dek_sentinel', sentinelEnc);
+                        } catch {}
+                        setShowPassphraseModal(false);
+                    });
+                    return;
                 } else {
                     setShowPassphraseModal(true);
                     setIsFirstTimeSetup(true);
@@ -107,7 +118,6 @@ export function NotesProvider({ children, session }) {
                         dekRef.current = dek; 
                         e2eeReadyRef.current = true;
                         setIsE2EEReady(true);
-                        sessionStorage.setItem('yotes_passphrase', passphrase);
                         window.__yotesDek = dekRef.current;
                         await ensureUser({
                             externalId: session.user.id,
@@ -119,6 +129,23 @@ export function NotesProvider({ children, session }) {
                             wrappedDekB64,
                             wrappedDekIvB64: wrappedIvB64,
                         });
+                        // Store local wrapped DEK with device key
+                        try {
+                            let localJwk = await getFromDB('sessions', 'local_wrap_jwk');
+                            let localWrapKey;
+                            if (!localJwk) {
+                                localWrapKey = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
+                                localJwk = await crypto.subtle.exportKey('jwk', localWrapKey);
+                                await setInDB('sessions', 'local_wrap_jwk', localJwk);
+                            } else {
+                                localWrapKey = await crypto.subtle.importKey('jwk', localJwk, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+                            }
+                            const { wrappedDekB64: localWrappedDekB64, wrappedIvB64: localWrappedIvB64 } = await wrapDek(dekRef.current, localWrapKey);
+                            await setInDB('sessions', 'local_wrapped_dek', { wrappedDekB64: localWrappedDekB64, wrappedIvB64: localWrappedIvB64 });
+                            const sentinelExpected = `yotes_sentinel:${id}`;
+                            const sentinelEnc = await encryptString(dekRef.current, sentinelExpected);
+                            await setInDB('sessions', 'local_dek_sentinel', sentinelEnc);
+                        } catch {}
                         setShowPassphraseModal(false);
                     });
                     return;
@@ -272,7 +299,6 @@ export function NotesProvider({ children, session }) {
         setIsE2EEReady(false);
         setNotes([]);
         setTags([]);
-        sessionStorage.removeItem('yotes_passphrase');
         delete window.__yotesDek;
         setShowPassphraseModal(true);
         setIsFirstTimeSetup(false);
@@ -284,7 +310,6 @@ export function NotesProvider({ children, session }) {
                 dekRef.current = dek;
                 e2eeReadyRef.current = true;
                 setIsE2EEReady(true);
-                sessionStorage.setItem('yotes_passphrase', passphrase);
                 window.__yotesDek = dekRef.current;
                 setShowPassphraseModal(false);
             } else {
