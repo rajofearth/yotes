@@ -29,8 +29,8 @@ export default function DesktopHome({
       <main className="max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-8 space-y-6">
         <TagFilters tags={tags} onFilterChange={onFilterChange} />
         
-        {/* AI Summary Card - shown only when aiSettings are available and there's a search query */}
-        {aiSettings && searchQuery && (
+        {/* AI Summary Card - shown only when AI is enabled and there's a search query */}
+        {aiSettings?.enabled && searchQuery && (
           <AISummaryCard 
             notes={filteredNotes} 
             searchQuery={searchQuery} 

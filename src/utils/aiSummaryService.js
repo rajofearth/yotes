@@ -1,11 +1,24 @@
 import { convex } from '../lib/convexClient.tsx';
 import { api } from '../../convex/_generated/api';
+import { createGoogleGenerativeAI } from '@ai-sdk/google';
+import { generateText } from 'ai';
+import { decryptString } from '../lib/e2ee';
 
 const getAISettings = async (userId) => {
   try {
-    const settings = await convex.query(api.ai.getSettings, userId ? { userId } : {});
-    return settings;
-  } catch {
+    if (!userId) return null;
+    const settingsRaw = await convex.query(api.ai.getSettingsRaw, { userId });
+    if (!settingsRaw || !settingsRaw.enabled || !settingsRaw.apiKeyEnc) {
+      return { enabled: false, apiKey: null };
+    }
+    const dek = window.__yotesDek;
+    if (!dek) {
+      throw new Error('Encryption key not available');
+    }
+    const apiKey = await decryptString(dek, settingsRaw.apiKeyEnc);
+    return { enabled: settingsRaw.enabled, apiKey };
+  } catch (error) {
+    console.error('Error fetching AI settings:', error);
     return null;
   }
 };
@@ -18,99 +31,56 @@ export const canUseAIFeatures = async (isOnline, userId) => {
 };
 
 // Generate structured summary for search results using Gemini API
-export const generateSearchSummary = async (searchResults, searchQuery, apiKey) => {
+export const generateSearchSummary = async (searchResults, searchQuery, userId) => {
+  const aiSettings = await getAISettings(userId);
+  if (!aiSettings || !aiSettings.enabled || !aiSettings.apiKey) {
+    throw new Error('AI features are not enabled');
+  }
   if (!searchResults || searchResults.length === 0) {
     return null;
   }
 
-  try {
-    const formattedResults = searchResults.map(note => ({
-      id: note.id,
-      title: note.title,
-      content: note.content.substring(0, 200) + (note.content.length > 200 ? '...' : ''),
-      tags: note.tags || [],
-      createdAt: note.createdAt
-    }));
+  const googleProvider = createGoogleGenerativeAI({ apiKey: aiSettings.apiKey });
+  const model = googleProvider('gemini-2.5-flash-lite');
+  const formattedResults = searchResults.map(note => ({
+    id: note.id,
+    title: note.title,
+    content: note.content.substring(0, 200) + (note.content.length > 200 ? '...' : ''),
+    tags: note.tags || [],
+    createdAt: note.createdAt
+  }));
 
-    const prompt = {
-      contents: [
-        {
-          parts: [
-            {
-              text: `You are a helpful AI summarizing search results for a notes application. Please analyze these search results for the query "${searchQuery}" and provide a structured summary:
-              
+  const prompt = `You are a helpful AI summarizing search results for a notes application. Analyze these results for the query "${searchQuery}" and provide a structured summary.
+
 Search Results: ${JSON.stringify(formattedResults)}
 
-Please generate a concise summary with these sections:
-1. Overview (2-3 sentences)
-2. Common Themes (bullet points)
-3. Key Takeaways (bullet points)
-4. Suggested Tags (comma separated) 
-
-Format your response as JSON with the following structure:
+Generate JSON only with this exact structure:
 {
-  "overview": "Overview text here...",
-  "themes": ["Theme 1", "Theme 2", ...],
-  "takeaways": ["Takeaway 1", "Takeaway 2", ...],
-  "suggestedTags": ["tag1", "tag2", ...]
-}
-Example Response:
-{
-  "overview": "The search results contain a single note titled 'MCP Collection From An X Post'. This note appears to be a collection of resources, specifically related to a server designed to fetch code examples and documentation for Large Language Models (LLMs) and AI code editors.",
-  "themes": ["LLMs", "Code Examples", "Documentation", "AI Code Editors", "MCP Server"],
-  "takeaways": ["MCP Resources are related to a server for fetching LLM code examples.", "The resources originated from an 'X Post' (likely Twitter)."],
-  "suggestedTags": ["MCP", "LLM", "Code Examples", "Documentation", "AI Code Editors", "X Post"]
+  "overview": string,
+  "themes": string[],
+  "takeaways": string[],
+  "suggestedTags": string[]
 }
 
-Keep your response concise and directly relevant to the search query.
-Respond with ONLY the JSON object and no additional text.`
-            }
-          ]
-        }
-      ]
-    };
+Respond with ONLY the JSON object.`;
 
-    const endpoint = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
-    
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-goog-api-key': apiKey
-      },
-      body: JSON.stringify(prompt),
-    });
+  const { text } = await generateText({
+    model,
+    tools: {
+      google_search: googleProvider.tools.googleSearch({}),
+      url_context: googleProvider.tools.urlContext({}),
+    },
+    prompt
+  });
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(`API request failed: ${errorData.error?.message || response.statusText}`);
-    }
-
-    const data = await response.json();
-
-    const textResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    
-    if (!textResponse) {
-      throw new Error('Invalid response from API');
-    }
-    
-    let jsonMatch = textResponse.match(/\{[\s\S]*\}/);
-    let summary;
-    
-    if (jsonMatch) {
-      try {
-        summary = JSON.parse(jsonMatch[0]);
-      } catch (err) {
-        throw new Error('Failed to parse summary from API response');
-      }
-    } else {
-      throw new Error('No valid JSON found in API response');
-    }
-    
-    return summary;
-  } catch (error) {
-    console.error('Error generating AI summary:', error);
-    throw error;
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) {
+    throw new Error('No valid JSON found in AI response');
+  }
+  try {
+    return JSON.parse(jsonMatch[0]);
+  } catch (err) {
+    throw new Error('Failed to parse summary from AI response');
   }
 };
 

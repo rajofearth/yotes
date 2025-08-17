@@ -13,7 +13,7 @@ export default function NoteEditor() {
   const { id: noteId } = useParams(); // Get note ID from params (if editing)
   const navigate = useNavigate();
   const location = useLocation();
-  const { createNote, updateNote, notes, tags, createTag, isLoading: isNotesLoading, allTags } = useNotes();
+  const { createNote, updateNote, notes, tags, createTag, isLoading: isNotesLoading, allTags, convexUserId } = useNotes();
   const showToast = useToast();
 
   const [isSaving, setIsSaving] = useState(false);
@@ -33,12 +33,15 @@ export default function NoteEditor() {
   const isCreate = !noteId;
   // Ref to ensure image data is applied only once
   const appliedImageData = useRef(false);
+  const imageInFlightRef = useRef(false);
   
   // Handle importing note fields from an image (moved up and using useCallback)
   const handleImportImage = useCallback(async (file) => {
+    if (imageInFlightRef.current) return;
+    imageInFlightRef.current = true;
     setIsImportingImage(true);
     try {
-      const fields = await generateNoteFromImage(file);
+      const fields = await generateNoteFromImage(file, convexUserId);
       // Update note with returned fields
       setNote(prev => ({
         ...prev,
@@ -53,9 +56,10 @@ export default function NoteEditor() {
       console.error('Image import error:', error);
       showToast(error.message || 'Failed to import from image', 'error');
     } finally {
+      imageInFlightRef.current = false;
       setIsImportingImage(false);
     }
-  }, [showToast, setNote, setHasChanges]);
+  }, [showToast, setNote, setHasChanges, convexUserId]);
 
   // Handle image data passed from image upload modal
   useEffect(() => {

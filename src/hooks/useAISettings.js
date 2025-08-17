@@ -1,17 +1,21 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useOnlineStatus } from '../contexts/OnlineStatusContext';
 import { useMutation, useQuery } from 'convex/react';
+import { encryptString } from '../lib/e2ee';
+import { useNotes } from '../contexts/NotesContext';
 import { api } from '../../convex/_generated/api';
 
 export const useAISettings = () => {
   const isOnline = useOnlineStatus();
+  // Get Convex userId for AI settings operations
+  const { convexUserId } = useNotes();
   const [aiSettings, setAiSettings] = useState({
     enabled: false,
     apiKey: null,
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const getSettings = useQuery(api.ai.getSettings, 'skip');
+  const getSettings = useQuery(api.ai.getSettings, convexUserId ? { userId: convexUserId } : 'skip');
   const saveSettings = useMutation(api.ai.saveSettings);
 
   const loadAISettings = useCallback(async () => {
@@ -30,27 +34,38 @@ export const useAISettings = () => {
   const updateSessionCache = async () => {};
 
   const saveAISettings = useCallback(async (newSettings) => {
+    if (!convexUserId) {
+      throw new Error('User not authenticated for AI settings');
+    }
     try {
-      await saveSettings({ userId: newSettings.userId, enabled: newSettings.enabled, apiKey: newSettings.apiKey });
-      setAiSettings({ enabled: !!newSettings.enabled, apiKey: newSettings.apiKey ? '••••••' : null });
+      const dek = window.__yotesDek;
+      if (!dek) throw new Error('Encryption key not available');
+      const mutationArgs = { userId: convexUserId, enabled: newSettings.enabled };
+      if (newSettings.apiKey !== undefined) {
+        // Encrypt API key
+        const apiKeyEnc = await encryptString(dek, newSettings.apiKey);
+        mutationArgs.apiKeyEnc = apiKeyEnc;
+      }
+      await saveSettings(mutationArgs);
+      setAiSettings({ enabled: !!newSettings.enabled, apiKey: newSettings.apiKey ? '••••••' : aiSettings.apiKey });
       setError(null);
       return true;
     } catch (err) {
       setError('Failed to save AI settings');
       throw err;
     }
-  }, [saveSettings]);
+  }, [saveSettings, convexUserId, aiSettings.apiKey]);
 
   // Toggle AI features
   const toggleAiFeatures = useCallback(async (enabled) => {
     const newSettings = { ...aiSettings, enabled };
-    await saveAISettings(newSettings);
+    return saveAISettings(newSettings);
   }, [aiSettings, saveAISettings]);
 
   // Save API Key
   const saveApiKey = useCallback(async (apiKey) => {
     const newSettings = { ...aiSettings, apiKey };
-    await saveAISettings(newSettings);
+    return saveAISettings(newSettings);
   }, [aiSettings, saveAISettings]);
 
   // Load settings on initial mount and when user changes

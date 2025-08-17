@@ -7,7 +7,7 @@ import { useSettings } from '../hooks/useSettings';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { applyFiltersAndSearch, debounce } from '../utils/noteFilters';
 import { useOnlineStatus } from '../contexts/OnlineStatusContext';
-import { canUseAIFeatures } from '../utils/aiSummaryService';
+// Removed canUseAIFeatures; use aiSettings.enabled directly
 
 export default function Home() {
   const isDesktop = useMediaQuery({ minWidth: 768 }); 
@@ -18,20 +18,9 @@ export default function Home() {
   const [filteredNotes, setFilteredNotes] = useState(notes);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTagIds, setSelectedTagIds] = useState(['all']);
-  const [aiEnabled, setAiEnabled] = useState(false);
   const isOnline = useOnlineStatus();
 
   // No IndexedDB refresh with Convex
-
-  // Check if AI features can be used
-  useEffect(() => {
-    const checkAiFeatures = async () => {
-      const canUseAi = await canUseAIFeatures(isOnline);
-      setAiEnabled(canUseAi);
-    };
-    
-    checkAiFeatures();
-  }, [isOnline, aiSettings]);
 
   useEffect(() => {
     if (location.state?.refresh) {
@@ -62,7 +51,7 @@ export default function Home() {
     filteredNotes,
     setFilteredNotes,
     searchQuery,
-    aiSettings: aiEnabled ? aiSettings : null,
+    aiSettings: aiSettings?.enabled ? aiSettings : null,
     onCreateTag: handleCreateTag,
   };
 

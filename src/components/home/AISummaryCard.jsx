@@ -1,10 +1,11 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Brain, RefreshCw, X, ChevronDown, ChevronUp, Tag, Sparkles, Lightbulb, List } from 'lucide-react';
 import { Skeleton } from '../ui/skeleton';
 import { Badge } from '../ui/badge';
 import { generateSearchSummary } from '../../utils/aiSummaryService';
+import { useNotes } from '../../contexts/NotesContext';
 import { useToast } from '../../contexts/ToastContext';
 
 export const AISummaryCard = ({ 
@@ -19,25 +20,34 @@ export const AISummaryCard = ({
   const [expanded, setExpanded] = useState(true);
   const showToast = useToast();
 
-  const fetchSummary = useCallback(async () => {
-    if (!searchQuery || notes.length === 0 || !aiSettings?.apiKey) {
-      return;
-    }
+  // Get current user's Convex ID for AI requests
+  const { convexUserId } = useNotes();
 
+  // Prevent duplicate fetches (StrictMode and re-renders)
+  const inFlightKeyRef = useRef(null);
+  const completedKeyRef = useRef(null);
+
+  const requestKey = useMemo(() => {
+    const sortedIds = (notes || []).map(n => n.id).sort().join(',');
+    return `${searchQuery || ''}|${sortedIds}|${convexUserId || ''}`;
+  }, [notes, searchQuery, convexUserId]);
+
+  const fetchSummary = useCallback(async (key) => {
     setLoading(true);
     setError(null);
-    
     try {
-      const summaryData = await generateSearchSummary(notes, searchQuery, aiSettings.apiKey);
+      const summaryData = await generateSearchSummary(notes, searchQuery, convexUserId);
       setSummary(summaryData);
     } catch (err) {
       console.error('Failed to generate summary:', err);
       setError(err.message || 'Failed to generate summary');
       showToast('Failed to generate AI summary', 'error');
     } finally {
+      inFlightKeyRef.current = null;
+      completedKeyRef.current = key;
       setLoading(false);
     }
-  }, [notes, searchQuery, aiSettings?.apiKey, showToast]);
+  }, [notes, searchQuery, convexUserId, showToast]);
 
   const handleCreateTag = (tagName) => {
     if (onCreateTag && tagName) {
@@ -47,15 +57,28 @@ export const AISummaryCard = ({
 
   const handleRefresh = () => {
     setSummary(null);
-    fetchSummary();
+    // Allow a fresh request regardless of previous completion
+    completedKeyRef.current = null;
+    if (aiSettings?.enabled && searchQuery && notes.length > 0) {
+      const key = requestKey;
+      inFlightKeyRef.current = key;
+      fetchSummary(key);
+    }
   };
 
-  // Auto-fetch the summary when component mounts or when search changes
+  // Debounce AI summary until user stops typing for a bit
   useEffect(() => {
-    if (!summary && !loading && !error) {
-      fetchSummary();
-    }
-  }, [summary, loading, error, fetchSummary]);
+    if (!aiSettings?.enabled || !searchQuery || notes.length === 0) return;
+    const key = requestKey;
+    if (inFlightKeyRef.current === key || completedKeyRef.current === key) return;
+    const TYPING_DELAY_MS = 800;
+    const timer = setTimeout(() => {
+      if (inFlightKeyRef.current === key || completedKeyRef.current === key) return;
+      inFlightKeyRef.current = key;
+      fetchSummary(key);
+    }, TYPING_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [aiSettings?.enabled, searchQuery, notes, requestKey, fetchSummary]);
 
   // If no search query or no search results, don't show the card
   if (!searchQuery || notes.length === 0) {
