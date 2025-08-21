@@ -116,4 +116,23 @@ export const clearAvatar = mutation({
   },
 });
 
+export const getMigrationStatus = query({
+  args: { userId: v.id("users") },
+  handler: async (ctx, { userId }) => {
+    const user = await ctx.db.get(userId);
+    if (!user) return { done: false };
+    return { done: Boolean((user as any).migrationDone) };
+  },
+});
+
+export const setMigrationDone = mutation({
+  args: { userId: v.id("users") },
+  handler: async (ctx, { userId }) => {
+    const user = await ctx.db.get(userId);
+    if (!user) throw new Error("User not found");
+    await ctx.db.patch(userId, { migrationDone: true, updatedAt: Date.now() } as any);
+    return { ok: true };
+  },
+});
+
 

@@ -18,6 +18,7 @@ const SyncButton = () => {
 	const [complete, setComplete] = useState(false);
 	const [progress, setProgress] = useState(0);
 	const [message, setMessage] = useState('');
+	const [migrationDone, setMigrationDone] = useState(false);
 
 	const upsertTag = useMutation(api.tags.create);
 	const upsertNote = useMutation(api.notes.create);
@@ -49,6 +50,11 @@ const SyncButton = () => {
 		check();
 		return () => { cancelled = true; };
 	}, []);
+
+
+	// Convex user flag for migration completion
+	const migrationStatus = useQuery(api.users.getMigrationStatus, convexUserId ? { userId: convexUserId } : 'skip');
+	const markMigrationDone = useMutation(api.users.setMigrationDone);
 
 	useEffect(() => {
 		if (hasLocalYotes) {
@@ -117,6 +123,8 @@ const SyncButton = () => {
 			setProgress(100); setMessage('Migration completed');
 			setComplete(true);
 			showToast('Local migration complete', 'success');
+			setMigrationDone(true);
+			try { if (convexUserId) { await markMigrationDone({ userId: convexUserId }); } } catch {}
 		} catch (e) {
 			showToast('Migration failed', 'error');
 		} finally {
@@ -126,6 +134,10 @@ const SyncButton = () => {
 
 	// UI states
 	const convexHasData = (Array.isArray(existingNotes) && existingNotes.length > 0) || (Array.isArray(existingTags) && existingTags.length > 0);
+	if (migrationDone || (migrationStatus && migrationStatus.done)) {
+		return null;
+	}
+
 	if (migrating) {
 		return (
 			<button

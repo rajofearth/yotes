@@ -12,6 +12,7 @@ export default defineSchema({
     encIterations: v.optional(v.number()),
     wrappedDekB64: v.optional(v.string()),
     wrappedDekIvB64: v.optional(v.string()),
+    migrationDone: v.optional(v.boolean()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
