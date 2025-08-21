@@ -113,7 +113,9 @@ const SyncButton = () => {
 					const titleEnc = n?.title ? await encryptString(window.__yotesDek, n.title) : undefined;
 					const descriptionEnc = n?.description ? await encryptString(window.__yotesDek, n.description) : undefined;
 					const contentEnc = n?.content ? await encryptString(window.__yotesDek, n.content) : undefined;
-					await upsertNote({ userId: convexUserId, titleEnc, descriptionEnc, contentEnc, tags: mappedTags });
+					const createdAt = n?.createdAt ? Date.parse(n.createdAt) : undefined;
+					const updatedAt = n?.updatedAt ? Date.parse(n.updatedAt) : createdAt;
+					await upsertNote({ userId: convexUserId, titleEnc, descriptionEnc, contentEnc, tags: mappedTags, createdAt, updatedAt });
 				} catch (e) {
 					// continue
 				}

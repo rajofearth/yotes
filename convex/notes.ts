@@ -22,6 +22,8 @@ export const create = mutation({
     descriptionEnc: v.optional(v.object({ ct: v.string(), iv: v.string() })),
     contentEnc: v.optional(v.object({ ct: v.string(), iv: v.string() })),
     tags: v.array(v.id("tags")),
+    createdAt: v.optional(v.number()),
+    updatedAt: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const now = Date.now();
@@ -31,8 +33,8 @@ export const create = mutation({
       descriptionEnc: args.descriptionEnc,
       contentEnc: args.contentEnc,
       tags: args.tags,
-      createdAt: now,
-      updatedAt: now,
+      createdAt: args.createdAt ?? now,
+      updatedAt: args.updatedAt ?? now,
     });
     return await ctx.db.get(id);
   },
