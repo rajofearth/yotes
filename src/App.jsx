@@ -224,21 +224,25 @@ function App() {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, newSession) => {
       if (!mounted) return;
-      const wasAuth = !!session;
-      const isAuth = !!newSession;
-      setSession(newSession);
-      setIsAuthLoading(false); // Auth state confirmed
 
-      if (event === 'SIGNED_IN' && !wasAuth) {
-        // Start load sequence only on first sign-in transition
-        setIsInitialLoad(true);
-      } else if (event === 'SIGNED_OUT') {
-        setIsInitialLoad(false); // Stop load sequence on sign-out
-      } else if (event === 'TOKEN_REFRESH_FAILED') {
-        console.warn('Supabase token refresh failed, you might need to re-login');
-        // Optionally handle this case (could redirect to login)
-      }
-      // else ignore other events to avoid re-triggering global loading UI
+      setSession(prevSession => {
+        const wasAuth = !!prevSession;
+        const isAuth = !!newSession;
+
+        setIsAuthLoading(false); // Auth state confirmed
+
+        if (event === 'SIGNED_IN' && !wasAuth && isAuth) {
+          // Only trigger initial load on real auth transition from logged out -> logged in
+          setIsInitialLoad(true);
+        } else if (event === 'SIGNED_OUT') {
+          setIsInitialLoad(false); // Stop load sequence on sign-out
+        } else if (event === 'TOKEN_REFRESH_FAILED') {
+          console.warn('Supabase token refresh failed, you might need to re-login');
+        }
+        // Ignore token refreshes or redundant SIGNED_IN events to avoid flashing the progress UI
+
+        return newSession;
+      });
     });
 
     return () => { mounted = false; subscription?.unsubscribe(); };
