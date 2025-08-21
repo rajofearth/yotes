@@ -345,7 +345,7 @@ export function NotesProvider({ children, session }) {
             isE2EEReady,
             lockNotes,
         }}>
-            {isE2EEReady ? children : null}
+            {children}
             <PassphraseModal
                 isOpen={showPassphraseModal}
                 onConfirm={handlePassphraseConfirm}
