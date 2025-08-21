@@ -128,11 +128,20 @@ const SyncButton = () => {
 	const convexHasData = (Array.isArray(existingNotes) && existingNotes.length > 0) || (Array.isArray(existingTags) && existingTags.length > 0);
 	if (migrating) {
 		return (
-			<div className="fixed bottom-24 right-4 z-50 bg-bg-primary text-text-primary/80 rounded-full p-4 shadow-lg flex items-center gap-2 ring-1 ring-overlay/20" title={message || 'Migrating...'} role="status" aria-label="Migrating data">
+			<button
+				type="button"
+				disabled
+				className={`fixed bottom-24 right-4 z-50 bg-bg-primary text-text-primary/80 rounded-full px-4 py-3 shadow-lg flex items-center gap-2 ring-1 ring-overlay/20`}
+				title={message || 'Migrating...'}
+				aria-live="polite"
+				aria-busy="true"
+			>
+				<span className="text-xs whitespace-nowrap max-w-[180px] overflow-hidden text-ellipsis">
+					{message ? message.substring(0, 40) : 'Migrating...'}
+				</span>
 				<Loader2 className="h-5 w-5 text-blue-400 animate-spin" />
-				<span className="text-xs whitespace-nowrap pr-1 max-w-[180px] overflow-hidden text-ellipsis">{message ? message.substring(0, 40) : 'Migrating...'}</span>
 				<span className="text-[10px] text-text-primary/50">{progress}%</span>
-			</div>
+			</button>
 		);
 	}
 
@@ -142,7 +151,13 @@ const SyncButton = () => {
 
 	if (complete && isOnline) {
 		return (
-			<button onClick={migrate} className={`fixed bottom-24 right-4 z-50 bg-bg-primary text-text-primary hover:bg-overlay/10 rounded-full p-4 shadow-lg flex items-center justify-center transition-all duration-300 ring-1 ring-overlay/20 ${isAnimating ? 'animate-pulse' : ''}`} title="Migration complete. Click to run again if needed.">
+			<button
+				type="button"
+				onClick={migrate}
+				className={`fixed bottom-24 right-4 z-50 bg-bg-primary text-text-primary hover:bg-overlay/10 rounded-full px-4 py-3 shadow-lg flex items-center gap-2 transition-all duration-300 ring-1 ring-overlay/20 ${isAnimating ? 'animate-pulse' : ''}`}
+				title="Migration complete. Click to run again if needed."
+			>
+				<span className="text-xs whitespace-nowrap">Migration done</span>
 				<CheckCircle2 className="h-5 w-5 text-green-500" />
 			</button>
 		);
@@ -150,7 +165,14 @@ const SyncButton = () => {
 
 	if (isOnline && hasLocalYotes) {
 		return (
-			<button onClick={migrate} disabled={!isOnline} className={`fixed bottom-24 right-4 z-50 bg-bg-primary text-text-primary hover:bg-overlay/10 rounded-full p-4 shadow-lg flex items-center justify-center transition-all duration-300 ring-1 ring-overlay/20 ${isAnimating ? 'animate-pulse' : ''} disabled:opacity-50 disabled:pointer-events-none`} title={isOnline ? 'Migrate your local data to Convex' : 'Connect to internet to migrate'}>
+			<button
+				type="button"
+				onClick={migrate}
+				disabled={!isOnline}
+				className={`fixed bottom-24 right-4 z-50 bg-bg-primary text-text-primary hover:bg-overlay/10 rounded-full px-4 py-3 shadow-lg flex items-center gap-2 transition-all duration-300 ring-1 ring-overlay/20 ${isAnimating ? 'animate-pulse' : ''} disabled:opacity-50 disabled:pointer-events-none`}
+				title={isOnline ? 'Migrate your local data to Convex' : 'Connect to internet to migrate'}
+			>
+				<span className="text-xs whitespace-nowrap">Migrate</span>
 				<Upload className="h-5 w-5 text-gray-400" />
 				<span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-5 h-5 flex items-center justify-center rounded-full">!</span>
 			</button>
