@@ -121,9 +121,13 @@ const SyncButton = () => {
 						}
 						return undefined;
 					};
-					const createdAt = toMillis(n?.createdAt);
-					const updatedAt = toMillis(n?.updatedAt) ?? createdAt;
-					await upsertNote({ userId: convexUserId, titleEnc, descriptionEnc, contentEnc, tags: mappedTags, createdAt, updatedAt });
+					const roundToSeconds = (ms) => (typeof ms === 'number' && Number.isFinite(ms)) ? Math.floor(ms / 1000) * 1000 : undefined;
+					const createdAtMs = roundToSeconds(toMillis(n?.createdAt));
+					const updatedAtMs = roundToSeconds(toMillis(n?.updatedAt) ?? createdAtMs);
+					const noteArgs = { userId: convexUserId, titleEnc, descriptionEnc, contentEnc, tags: mappedTags };
+					if (typeof createdAtMs === 'number') noteArgs.createdAt = createdAtMs;
+					if (typeof updatedAtMs === 'number') noteArgs.updatedAt = updatedAtMs;
+					await upsertNote(noteArgs);
 				} catch (e) {
 					// continue
 				}
