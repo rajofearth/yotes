@@ -1,5 +1,7 @@
-import React, { type PropsWithChildren } from "react";
+/// <reference types="vite/client" />
+import type { PropsWithChildren } from "react";
 import { ConvexProvider, ConvexReactClient } from "convex/react";
+import { supabase } from "@/utils/supabaseClient";
 
 const convexUrl = import.meta.env.VITE_CONVEX_URL;
 if (!convexUrl) {
@@ -7,6 +9,22 @@ if (!convexUrl) {
 }
 
 export const convex = new ConvexReactClient(convexUrl);
+
+// Bridge Supabase auth to Convex
+convex.setAuth(async () => {
+  const { data } = await supabase.auth.getSession();
+  return data.session?.access_token ?? null;
+});
+
+// Also refresh Convex auth when Supabase auth state changes
+try {
+  supabase.auth.onAuthStateChange(async () => {
+    convex.setAuth(async () => {
+      const { data } = await supabase.auth.getSession();
+      return data.session?.access_token ?? null;
+    });
+  });
+} catch {}
 
 export function ConvexProviderWrapper({ children }: PropsWithChildren) {
   return <ConvexProvider client={convex}>{children}</ConvexProvider>;

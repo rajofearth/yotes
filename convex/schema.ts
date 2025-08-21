@@ -7,6 +7,7 @@ export default defineSchema({
     email: v.string(),
     displayName: v.optional(v.string()),
     avatarUrl: v.optional(v.string()),
+    avatarStorageId: v.optional(v.id("_storage")),
     encSaltB64: v.optional(v.string()),
     encIterations: v.optional(v.number()),
     wrappedDekB64: v.optional(v.string()),

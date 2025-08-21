@@ -14,12 +14,14 @@ import { supabase } from '../../utils/supabaseClient';
 import { getFromDB, setInDB, openDB } from '../../utils/indexedDB';
 import { useOnlineStatus } from '../../contexts/OnlineStatusContext';
 import { useSettings } from '../../hooks/useSettings';
-import { useAISettings } from '../../hooks/useAISettings'; // Import useAISettings
+import { useAISettings } from '../../hooks/useAISettings'; 
 import { ImageUploadModal } from '../image/ImageUploadModal';
 import { useToast } from '../../contexts/ToastContext';
 import { TextShimmer } from '../ui/text-shimmer';
 import { Badge } from '../ui/badge';
 import { useNotes } from '../../hooks/useNotes';
+import { useQuery } from 'convex/react';
+import { api } from '../../../convex/_generated/api';
 
 export default function NavBar({ onSearch }) {
   const navigate = useNavigate();
@@ -31,6 +33,14 @@ export default function NavBar({ onSearch }) {
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
   const showToast = useToast();
   const { isE2EEReady, lockNotes } = useNotes();
+  const externalId = user?.id;
+  const convexAvatar = useQuery(api.users.getAvatarUrl, externalId ? { externalId } : 'skip');
+  const [avatarError, setAvatarError] = useState(false);
+
+  useEffect(() => {
+    // Reset error when a new URL arrives
+    setAvatarError(false);
+  }, [convexAvatar?.url]);
 
   useEffect(() => {
     let isMounted = true;
@@ -75,7 +85,7 @@ export default function NavBar({ onSearch }) {
     return () => { isMounted = false };
   }, [isOnline]);
 
-  const profilePicture = user?.user_metadata?.avatar_url; // No default here
+  const profilePicture = convexAvatar?.url ?? null;
 
   const handleLockNotes = () => {
     if (lockNotes) {
@@ -206,11 +216,16 @@ export default function NavBar({ onSearch }) {
                     {isLoading ? (
                       <div className="h-[80%] w-[80%] rounded-full bg-overlay/10 animate-pulse" />
                     ) : (
-                       profilePicture ? (
-                          <img src={profilePicture} alt="User profile" className="h-[80%] w-[80%] rounded-full object-cover transition-opacity hover:opacity-90" onError={(e) => (e.target.src = 'https://placehold.co/40')} />
-                       ) : (
-                           <div className="h-[80%] w-[80%] rounded-full bg-overlay/10 flex items-center justify-center text-icon-primary"><UserIcon className="h-5 w-5"/></div> // Generic user icon
-                       )
+                      profilePicture && !avatarError ? (
+                        <img
+                          src={profilePicture}
+                          alt="User profile"
+                          className="h-[80%] w-[80%] rounded-full object-cover transition-opacity hover:opacity-90"
+                          onError={() => setAvatarError(true)}
+                        />
+                      ) : (
+                        <div className="h-[80%] w-[80%] rounded-full bg-overlay/10 flex items-center justify-center text-icon-primary"><UserIcon className="h-5 w-5"/></div>
+                      )
                     )}
                     <span className="sr-only">Avatar</span>
                   </Button>

@@ -1,4 +1,4 @@
-import { mutation, query } from "./_generated/server";
+import { action, mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 
 export const ensure = mutation({
@@ -56,6 +56,63 @@ export const byExternalId = query({
       .query("users")
       .withIndex("byExternalId", (q) => q.eq("externalId", externalId))
       .unique();
+  },
+});
+
+export const generateAvatarUploadUrl = action({
+  args: {},
+  handler: async (ctx) => {
+    const url = await ctx.storage.generateUploadUrl();
+    return { url };
+  },
+});
+
+export const setAvatar = mutation({
+  args: {
+    userId: v.id("users"),
+    storageId: v.id("_storage"),
+  },
+  handler: async (ctx, { userId, storageId }) => {
+    const user = await ctx.db.get(userId);
+    if (!user) throw new Error("User not found");
+    await ctx.db.patch(userId, {
+      avatarStorageId: storageId,
+      // Clear legacy URL if any
+      avatarUrl: undefined,
+      updatedAt: Date.now(),
+    } as any);
+    return { ok: true };
+  },
+});
+
+export const getAvatarUrl = query({
+  args: { externalId: v.string() },
+  handler: async (ctx, { externalId }) => {
+    const user = await ctx.db
+      .query("users")
+      .withIndex("byExternalId", (q) => q.eq("externalId", externalId))
+      .unique();
+    if (!user) return null;
+    if ((user as any).avatarStorageId) {
+      const url = await ctx.storage.getUrl((user as any).avatarStorageId);
+      return url ? { url, updatedAt: user.updatedAt } : null;
+    }
+    if (user.avatarUrl) return { url: user.avatarUrl, updatedAt: user.updatedAt };
+    return null;
+  },
+});
+
+export const clearAvatar = mutation({
+  args: { userId: v.id("users") },
+  handler: async (ctx, { userId }) => {
+    const user = await ctx.db.get(userId);
+    if (!user) throw new Error("User not found");
+    const storageId = (user as any).avatarStorageId;
+    if (storageId) {
+      try { await ctx.storage.delete(storageId); } catch {}
+    }
+    await ctx.db.patch(userId, { avatarStorageId: undefined, avatarUrl: undefined, updatedAt: Date.now() } as any);
+    return { ok: true };
   },
 });
 
