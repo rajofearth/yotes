@@ -82,10 +82,6 @@ export const generateSearchSummary = async (searchResults, searchQuery, userId) 
 
   const { object } = await generateObject({
     model,
-    tools: {
-      google_search: googleProvider.tools.googleSearch({}),
-      url_context: googleProvider.tools.urlContext({}),
-    },
     schema: z.object({
       overview: z.string(),
       themes: z.array(z.string()),

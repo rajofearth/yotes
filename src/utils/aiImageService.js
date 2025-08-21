@@ -1,6 +1,6 @@
 import { getAISettings } from './aiSummaryService';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
-import { generateText } from 'ai';
+import { generateObject } from 'ai';
 import { z } from 'zod';
 
 export const generateNoteFromImage = async (file, userId) => {
@@ -20,8 +20,15 @@ export const generateNoteFromImage = async (file, userId) => {
       `3. content - The main body text extracted or inferred from the image\n\n` +
       `Respond with ONLY a valid JSON object with these exact keys: "title", "description", "content".`;
 
-    const result = await generateText({
+    const NoteSchema = z.object({
+      title: z.string().min(1).max(160),
+      description: z.string().min(1).max(600),
+      content: z.string().min(1),
+    });
+
+    const { object } = await generateObject({
       model,
+      schema: NoteSchema,
       messages: [
         {
           role: 'user',
@@ -33,32 +40,9 @@ export const generateNoteFromImage = async (file, userId) => {
       ],
       temperature: 0.2,
       topP: 0.95,
+      maxRetries: 1,
     });
-
-    const textResponse = result.text?.trim();
-    if (!textResponse) {
-      throw new Error('Invalid response format from AI image service');
-    }
-
-    const jsonMatch = textResponse.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      // Fallback: return plain text as content
-      return {
-        title: 'Note from Image',
-        description: 'Content extracted from image',
-        content: textResponse,
-      };
-    }
-
-    const parsed = JSON.parse(jsonMatch[0]);
-    // Validate structured output using Zod
-    const NoteSchema = z.object({
-      title: z.string().min(1).max(160),
-      description: z.string().min(1).max(600),
-      content: z.string().min(1),
-    });
-    const noteFields = NoteSchema.parse(parsed);
-    return noteFields;
+    return object;
   } catch (error) {
     throw new Error(error.message || 'Failed to process image');
   }

@@ -4,10 +4,7 @@ import { v } from "convex/values";
 export const list = query({
   args: { userId: v.id("users") },
   handler: async (ctx, { userId }) => {
-    return await ctx.db
-      .query("notes")
-      .withIndex("byUser", (q) => q.eq("userId", userId))
-      .collect();
+    return await ctx.db.query("notes").withIndex("byUser", (q) => q.eq("userId", userId)).collect();
   },
 });
 
@@ -66,7 +63,25 @@ export const update = mutation({
 export const remove = mutation({
   args: { id: v.id("notes") },
   handler: async (ctx, { id }) => {
+    const note = await ctx.db.get(id);
+    if (!note) throw new Error("Note not found");
     await ctx.db.delete(id);
+  },
+});
+
+
+export const secureList = query({
+  args: { externalId: v.string() },
+  handler: async (ctx, { externalId }) => {
+    const user = await ctx.db
+      .query("users")
+      .withIndex("byExternalId", (q) => q.eq("externalId", externalId))
+      .unique();
+    if (!user) return [];
+    return await ctx.db
+      .query("notes")
+      .withIndex("byUser", (q) => q.eq("userId", user._id))
+      .collect();
   },
 });
 

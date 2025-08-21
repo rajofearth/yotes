@@ -25,6 +25,13 @@ export const saveSettings = mutation({
     apiKeyEnc: v.optional(v.object({ ct: v.string(), iv: v.string() })),
   },
   handler: async (ctx, { userId, enabled, apiKey, apiKeyEnc }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthenticated");
+    const user = await ctx.db
+      .query("users")
+      .withIndex("byExternalId", (q) => q.eq("externalId", identity.subject))
+      .unique();
+    if (!user || user._id !== userId) throw new Error("Forbidden");
     const existing = await ctx.db
       .query("aiSettings")
       .withIndex("byUser", (q) => q.eq("userId", userId))
@@ -53,6 +60,13 @@ export const saveSettings = mutation({
 export const getSettingsRaw = query({
   args: { userId: v.id("users") },
   handler: async (ctx, { userId }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return null;
+    const user = await ctx.db
+      .query("users")
+      .withIndex("byExternalId", (q) => q.eq("externalId", identity.subject))
+      .unique();
+    if (!user || user._id !== userId) return null;
     const existing = await ctx.db
       .query("aiSettings")
       .withIndex("byUser", (q) => q.eq("userId", userId))
@@ -65,6 +79,13 @@ export const getSettingsRaw = query({
 export const getSummaryCache = query({
   args: { userId: v.id("users"), cacheKey: v.string() },
   handler: async (ctx, { userId, cacheKey }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return null;
+    const user = await ctx.db
+      .query("users")
+      .withIndex("byExternalId", (q) => q.eq("externalId", identity.subject))
+      .unique();
+    if (!user || user._id !== userId) return null;
     const row = await ctx.db
       .query("aiSummaries")
       .withIndex("byUserCacheKey", (q) => q.eq("userId", userId).eq("cacheKey", cacheKey))
@@ -83,6 +104,13 @@ export const putSummaryCache = mutation({
     ttlSeconds: v.optional(v.number()),
   },
   handler: async (ctx, { userId, cacheKey, summaryEnc, ttlSeconds }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthenticated");
+    const user = await ctx.db
+      .query("users")
+      .withIndex("byExternalId", (q) => q.eq("externalId", identity.subject))
+      .unique();
+    if (!user || user._id !== userId) throw new Error("Forbidden");
     const now = Date.now();
     const expiresAt = ttlSeconds ? now + ttlSeconds * 1000 : undefined;
     const existing = await ctx.db

@@ -21,8 +21,14 @@ const SyncButton = () => {
 
 	const upsertTag = useMutation(api.tags.create);
 	const upsertNote = useMutation(api.notes.create);
-	const existingTags = useQuery(api.tags.list, convexUserId ? { userId: convexUserId } : 'skip');
-	const existingNotes = useQuery(api.notes.list, convexUserId ? { userId: convexUserId } : 'skip');
+	const sessionExternalId = (typeof window !== 'undefined' && window.localStorage) ? (() => {
+		try {
+			// attempt to get session from IndexedDB or rely on upstream contexts; fallback to undefined
+			return null;
+		} catch { return null; }
+	})() : null;
+	const existingTags = useQuery(api.tags.secureList, sessionExternalId || convexUserId ? { externalId: sessionExternalId || '' } : 'skip');
+	const existingNotes = useQuery(api.notes.secureList, sessionExternalId || convexUserId ? { externalId: sessionExternalId || '' } : 'skip');
 	const existingTagMap = useMemo(() => {
 		if (!Array.isArray(existingTags)) return new Map();
 		const m = new Map();

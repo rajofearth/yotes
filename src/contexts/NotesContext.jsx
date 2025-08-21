@@ -27,8 +27,8 @@ export function NotesProvider({ children, session }) {
     const [isFirstTimeSetup, setIsFirstTimeSetup] = useState(false);
     const [passphraseCallback, setPassphraseCallback] = useState(null);
 
-    const listNotes = useQuery(api.notes.list, convexUserId && isE2EEReady ? { userId: convexUserId } : 'skip');
-    const listTags = useQuery(api.tags.list, convexUserId && isE2EEReady ? { userId: convexUserId } : 'skip');
+    const listNotes = useQuery(api.notes.secureList, session?.user?.id && isE2EEReady ? { externalId: session.user.id } : 'skip');
+    const listTags = useQuery(api.tags.secureList, session?.user?.id && isE2EEReady ? { externalId: session.user.id } : 'skip');
     const createNoteMutation = useMutation(api.notes.create);
     const updateNoteMutation = useMutation(api.notes.update);
     const deleteNoteMutation = useMutation(api.notes.remove);

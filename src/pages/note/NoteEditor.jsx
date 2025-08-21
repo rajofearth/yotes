@@ -8,12 +8,14 @@ import { TagManagementDialog } from '../../components/settings/TagManagementDial
 import { Loader2 } from 'lucide-react';
 import { generateNoteFromImage } from '../../utils/aiImageService';
 import { Skeleton } from '../../components/ui/skeleton';
+import { getFromDB, setInDB } from '../../utils/indexedDB';
+import { encryptString, decryptString } from '../../lib/e2ee';
 
 export default function NoteEditor() {
   const { id: noteId } = useParams(); // Get note ID from params (if editing)
   const navigate = useNavigate();
   const location = useLocation();
-  const { createNote, updateNote, notes, tags, createTag, isLoading: isNotesLoading, allTags, convexUserId } = useNotes();
+  const { createNote, updateNote, notes, tags, createTag, isLoading: isNotesLoading, allTags, convexUserId, isE2EEReady } = useNotes();
   const showToast = useToast();
 
   const [isSaving, setIsSaving] = useState(false);
@@ -94,20 +96,22 @@ export default function NoteEditor() {
     }
   }, [location.state, isCreate, navigate, handleImportImage]);
   
-  // Load draft from localStorage when creating a new note (per-user)
+  // Load draft from IndexedDB (encrypted) when creating a new note (per-user)
   useEffect(() => {
-    if (isCreate) {
-      const draftNote = localStorage.getItem(draftKey);
-      if (draftNote) {
-        try {
-          const parsedDraft = JSON.parse(draftNote);
-          setNote(parsedDraft);
-        } catch (error) {
-          console.error('Failed to parse draft note:', error);
+    if (!isCreate || !isE2EEReady) return;
+    (async () => {
+      try {
+        const enc = await getFromDB('sessions', draftKey);
+        if (enc?.ct && enc?.iv && window.__yotesDek) {
+          const json = await decryptString(window.__yotesDek, enc);
+          const parsed = JSON.parse(json);
+          setNote(parsed);
         }
+      } catch (e) {
+        // ignore corrupt drafts
       }
-    }
-  }, [isCreate, draftKey]);
+    })();
+  }, [isCreate, draftKey, isE2EEReady]);
 
   useEffect(() => {
     if (noteId && !isNotesLoading) { // Wait for notes to load
@@ -137,18 +141,21 @@ export default function NoteEditor() {
     // For create mode, we've already loaded from draft if available
   }, [noteId, notes, isNotesLoading, navigate, showToast, isCreate, hasChanges, lastSaved]);
 
-  // Debounced autosave draft to localStorage when note changes (per-user)
+  // Debounced autosave draft to IndexedDB (encrypted) when note changes (per-user)
   useEffect(() => {
-    if (!isCreate) return;
+    if (!isCreate || !isE2EEReady || !window.__yotesDek) return;
     const timer = setTimeout(() => {
       try {
-        localStorage.setItem(draftKey, JSON.stringify(note));
+        const json = JSON.stringify(note);
+        encryptString(window.__yotesDek, json).then((enc) => {
+          setInDB('sessions', draftKey, enc);
+        }).catch(() => {});
       } catch (e) {
         // Ignore storage errors
       }
     }, 400);
     return () => clearTimeout(timer);
-  }, [note, isCreate, draftKey]);
+  }, [note, isCreate, draftKey, isE2EEReady]);
 
   // Focus title input on initial mount
   useEffect(() => {
@@ -225,8 +232,8 @@ export default function NoteEditor() {
         setLastSaved(now);
         setHasChanges(false); // Reset after save
         showToast('Note created successfully', 'success');
-        // Clear draft after successful save
-        localStorage.removeItem(draftKey);
+        // Clear encrypted draft after successful save
+        try { await setInDB('sessions', draftKey, null); } catch {}
         navigate('/', { state: { resetFilters: true, refresh: true } });
       } else {
         await updateNote(noteId, { ...note, updatedAt: now.toISOString() });

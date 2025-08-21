@@ -7,6 +7,7 @@
     "dev": "concurrently --names \"web,server\" --prefix \"[{name}]\" -c \"blue,cyan\" \"bun run vite --port 4000\" \"bun run convex dev\"",
     "dev:web": "bun run vite --port 4000",
     "dev:server": "bun run convex dev",
+    "deploy:server": "convex deploy",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview"

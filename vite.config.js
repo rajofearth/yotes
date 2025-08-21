@@ -26,6 +26,11 @@ export default defineConfig({
             handler: 'CacheFirst',
             options: { cacheName: 'google-fonts-gstatic', expiration: { maxEntries: 10, maxAgeSeconds: 31536000 }, cacheableResponse: { statuses: [0, 200] } }
           },
+          // Do NOT cache app shell routes that may render decrypted content
+          {
+            urlPattern: ({ url }) => url.origin === self.location.origin && /^\/(?:$|note|settings|create|section)/.test(url.pathname),
+            handler: 'NetworkOnly',
+          },
         ],
         cleanupOutdatedCaches: true,
         navigateFallback: '/index.html',
@@ -33,7 +38,6 @@ export default defineConfig({
 
       // --- Development Options ---
       devOptions: {
-        // Enable PWA during development for offline testing
         enabled: true,
         type: 'module'
       },
@@ -108,10 +112,6 @@ export default defineConfig({
   base: '/',
   server: {
     port: 3000,
-    // Optional: Clear browser cache for the server host if issues persist
-    // fs: {
-    //   strict: false, // Allow serving outside of workspace root sometimes helps
-    // }
   },
   build: {
     outDir: 'dist',
