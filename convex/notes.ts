@@ -83,6 +83,7 @@ export const secureList = query({
     return await ctx.db
       .query("notes")
       .withIndex("byUser", (q) => q.eq("userId", user._id))
+      .order("desc")
       .collect();
   },
 });

@@ -44,7 +44,10 @@ export const CreateTagDialog = ({ open, onOpenChange, tagState, setTagState, han
         </div>
         <DialogFooter className="flex flex-col sm:flex-row justify-end gap-4">
           <Button
-            onClick={() => handleTagAction('create', { name: tagState.newName, color: tagState.newColor })}
+            onClick={async () => {
+              await handleTagAction('create', { name: tagState.newName, color: tagState.newColor });
+              onOpenChange(false);
+            }}
             disabled={!tagState.newName.trim()}
             className="bg-overlay/10 hover:bg-overlay/20"
           >

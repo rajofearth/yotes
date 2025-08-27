@@ -117,28 +117,30 @@ const handleDelete = useCallback(async (e) => {
             )}
           </div>
         </div>
-        {(note.tags && note.tags.length > 0) && (
-          <>
-            <hr className="mt-1 border-t border-overlay/10" />
-            <footer className="flex items-center gap-1 pt-1 overflow-x-scroll scrollbar-hide">
-              <span className="text-xs text-text-primary/60">
-                {formattedTime}
-              </span>
-              <span className="text-xs text-text-primary/60">|</span>
-              {note.tags.map((tagId, index) => {
-                const tag = tags.find(t => t.id === tagId);
-                return tag ? (
-                  <span
-                    key={`${note.id}-tag-${tagId}-${index}`}
-                    className={`inline-flex items-center px-1 py-0.5 rounded text-xs ${tag.color || 'bg-gray-500/20 text-gray-500'}`}
-                  >
-                    {tag.name}
-                  </span>
-                ) : null;
-              })}
-            </footer>
-          </>
-        )}
+        <>
+          <hr className="mt-1 border-t border-overlay/10" />
+          <footer className="flex items-center gap-1 pt-1 overflow-x-scroll scrollbar-hide">
+            <span className="text-xs text-text-primary/60">
+              {formattedTime}
+            </span>
+            {(note.tags && note.tags.length > 0) && (
+              <>
+                <span className="text-xs text-text-primary/60">|</span>
+                {note.tags.map((tagId, index) => {
+                  const tag = tags.find(t => t.id === tagId);
+                  return tag ? (
+                    <span
+                      key={`${note.id}-tag-${tagId}-${index}`}
+                      className={`inline-flex items-center px-1 py-0.5 rounded text-xs ${tag.color || 'bg-gray-500/20 text-gray-500'}`}
+                    >
+                      {tag.name}
+                    </span>
+                  ) : null;
+                })}
+              </>
+            )}
+          </footer>
+        </>
       </Card>
     );
   },
