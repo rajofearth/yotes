@@ -5,6 +5,7 @@ import { api } from '../../convex/_generated/api';
 import { deriveKekFromPassphrase, unwrapDek, generateDek, wrapDek, encryptString, decryptString, generateSaltB64 } from '../lib/e2ee';
 import { getFromDB, setInDB } from '../utils/indexedDB';
 import { PassphraseModal } from '../components/PassphraseModal';
+import { queueForBackgroundSync, listenForServiceWorkerMessages, isOnline } from '../utils/backgroundSync';
 
 export const NotesContext = createContext();
 
@@ -16,7 +17,8 @@ export function NotesProvider({ children, session }) {
     const [isSyncing] = useState(false);
     const [isInitialSync, setIsInitialSync] = useState(true);
     const [loadingState, setLoadingState] = useState({ progress: 0, message: 'Initializing...' });
-    const isOnline = useOnlineStatus();
+    const [syncStatus, setSyncStatus] = useState({ pending: 0, lastSync: null, error: null });
+    const isOnlineStatus = useOnlineStatus();
     const convex = useConvex();
     const ensureUser = useMutation(api.users.ensure);
     const [convexUserId, setConvexUserId] = useState(null);
@@ -26,6 +28,22 @@ export function NotesProvider({ children, session }) {
     const [showPassphraseModal, setShowPassphraseModal] = useState(false);
     const [isFirstTimeSetup, setIsFirstTimeSetup] = useState(false);
     const [passphraseCallback, setPassphraseCallback] = useState(null);
+
+    // Listen for service worker sync messages
+    useEffect(() => {
+        const cleanup = listenForServiceWorkerMessages((message) => {
+            if (message.type === 'SYNC_COMPLETE') {
+                setSyncStatus(prev => ({
+                    ...prev,
+                    lastSync: Date.now(),
+                    error: message.success ? null : message.error,
+                    pending: message.success ? 0 : prev.pending
+                }));
+            }
+        });
+
+        return cleanup;
+    }, []);
 
     const listNotes = useQuery(api.notes.secureList, session?.user?.id && isE2EEReady ? { externalId: session.user.id } : 'skip');
     const listTags = useQuery(api.tags.secureList, session?.user?.id && isE2EEReady ? { externalId: session.user.id } : 'skip');
@@ -210,6 +228,32 @@ export function NotesProvider({ children, session }) {
 
     const createNote = useCallback(async (noteData) => {
         if (!session?.user?.id) throw new Error('Not authenticated');
+        
+        // If offline, queue for background sync
+        if (!isOnline()) {
+            const queued = await queueForBackgroundSync('create-note', {
+                type: 'create-note',
+                userId: convexUserId,
+                noteData
+            });
+            
+            if (queued) {
+                setSyncStatus(prev => ({ ...prev, pending: prev.pending + 1 }));
+                // Return a temporary note object for immediate UI update
+                return {
+                    id: `temp-${Date.now()}`,
+                    title: noteData.title,
+                    description: noteData.description,
+                    content: noteData.content,
+                    tags: noteData.tags ?? [],
+                    createdAt: Date.now(),
+                    updatedAt: Date.now(),
+                    _temp: true
+                };
+            }
+        }
+
+        // Online: execute normally
         let payload = {
             userId: convexUserId,
             titleEnc: undefined,
@@ -231,10 +275,48 @@ export function NotesProvider({ children, session }) {
     }, [createNoteMutation, session, convexUserId]);
 
     const deleteNote = useCallback(async (noteId) => {
+        // If offline, queue for background sync
+        if (!isOnline()) {
+            const queued = await queueForBackgroundSync('delete-note', {
+                type: 'delete-note',
+                noteId
+            });
+            
+            if (queued) {
+                setSyncStatus(prev => ({ ...prev, pending: prev.pending + 1 }));
+                return; // Return early for offline
+            }
+        }
+
+        // Online: execute normally
         await deleteNoteMutation({ id: noteId });
     }, [deleteNoteMutation]);
 
     const updateNote = useCallback(async (noteId, noteData) => {
+        // If offline, queue for background sync
+        if (!isOnline()) {
+            const queued = await queueForBackgroundSync('update-note', {
+                type: 'update-note',
+                noteId,
+                noteData
+            });
+            
+            if (queued) {
+                setSyncStatus(prev => ({ ...prev, pending: prev.pending + 1 }));
+                // Return updated note for immediate UI update
+                return {
+                    id: noteId,
+                    title: noteData.title,
+                    description: noteData.description,
+                    content: noteData.content,
+                    tags: noteData.tags ?? [],
+                    updatedAt: Date.now(),
+                    _temp: true
+                };
+            }
+        }
+
+        // Online: execute normally
         let payload = {
             id: noteId,
             titleEnc: undefined,
@@ -336,14 +418,15 @@ export function NotesProvider({ children, session }) {
             deleteTag,
             refreshData: async () => {},
             refreshFromIndexedDB: async () => {},
-            hasPendingChanges: false,
+            hasPendingChanges: syncStatus.pending > 0,
             manualSyncWithDrive: async () => {},
             isManualSyncing: false,
-            syncProgressMessage: '',
+            syncProgressMessage: syncStatus.pending > 0 ? `${syncStatus.pending} items pending sync` : '',
             syncDiscrepancyDetected: false,
             checkSyncDiscrepancies: async () => false,
             isE2EEReady,
             lockNotes,
+            syncStatus,
         }}>
             {children}
             <PassphraseModal

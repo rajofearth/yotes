@@ -14,8 +14,9 @@ import { DonationCard } from '../components/settings/DonationCard';
 import { AccountActionsCard } from '../components/settings/AccountActionsCard';
 import { AIFeaturesCard } from '../components/settings/AIFeaturesCard';
 import BackupCard from '../components/settings/BackupCard.jsx';
+import NotificationSettingsCard from '../components/settings/NotificationSettingsCard';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
-import { Settings as SettingsIcon, User, Tag, BarChart, Heart, Shield, Brain } from 'lucide-react';
+import { Settings as SettingsIcon, User, Tag, BarChart, Heart, Shield, Brain, Bell } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../components/ui/dialog';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -139,6 +140,7 @@ export default function Settings() {
                                     <TabsTrigger value="tags" className="flex items-center gap-2 justify-start md:w-full text-left whitespace-nowrap"><Tag className="h-4 w-4" /><span className="hidden sm:inline">Tags</span></TabsTrigger>
                                     <TabsTrigger value="statistics" className="flex items-center gap-2 justify-start md:w-full text-left whitespace-nowrap"><BarChart className="h-4 w-4" /><span className="hidden sm:inline">Statistics</span></TabsTrigger>
                                     <TabsTrigger value="ai" className="flex items-center gap-2 justify-start md:w-full text-left whitespace-nowrap"><Brain className="h-4 w-4" /><span className="hidden sm:inline">AI Features</span></TabsTrigger>
+                                    <TabsTrigger value="notifications" className="flex items-center gap-2 justify-start md:w-full text-left whitespace-nowrap"><Bell className="h-4 w-4" /><span className="hidden sm:inline">Notifications</span></TabsTrigger>
                                     <TabsTrigger value="support" className="flex items-center gap-2 justify-start md:w-full text-left whitespace-nowrap"><Heart className="h-4 w-4" /><span className="hidden sm:inline">Support</span></TabsTrigger>
                                     <TabsTrigger value="security" className="flex items-center gap-2 justify-start md:w-full text-left whitespace-nowrap"><Shield className="h-4 w-4" /><span className="hidden sm:inline">Security</span></TabsTrigger>
                                 </TabsList>
@@ -183,6 +185,12 @@ export default function Settings() {
                                 <div className="space-y-4 sm:space-y-6">
                                     <h2 className="text-lg sm:text-xl font-semibold mb-2 sm:mb-4">AI Features</h2>
                                     <div className="max-w-lg"><AIFeaturesCard aiSettings={aiSettings} onSaveApiKey={handleSaveApiKey} onToggleAiFeatures={handleToggleAiFeatures} /></div>
+                                </div>
+                            )}
+                            {activeTab === 'notifications' && (
+                                <div className="space-y-4 sm:space-y-6">
+                                    <h2 className="text-lg sm:text-xl font-semibold mb-2 sm:mb-4">Notifications</h2>
+                                    <div className="max-w-lg"><NotificationSettingsCard /></div>
                                 </div>
                             )}
                             {activeTab === 'security' && (

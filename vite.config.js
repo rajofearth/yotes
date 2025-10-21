@@ -11,6 +11,9 @@ export default defineConfig({
       // --- General PWA Strategy ---
       registerType: 'autoUpdate',
       injectRegister: 'auto',
+      strategies: 'injectManifest',
+      srcDir: 'public',
+      filename: 'sw-custom.js',
 
       // --- Service Worker Caching (Workbox) ---
       workbox: {
@@ -44,6 +47,7 @@ export default defineConfig({
 
       // --- Web App Manifest ---
       manifest: {
+        id: '/',
         name: 'Yotes',
         short_name: 'Yotes',
         description: 'Privacy-first notes app.',
@@ -52,10 +56,13 @@ export default defineConfig({
         display: 'standalone',
         theme_color: '#1B1B1B',
         background_color: '#1B1B1B',
+        lang: 'en',
+        dir: 'ltr',
+        categories: ['productivity', 'utilities'],
         icons: [
             { src: 'android-chrome-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
             { src: 'android-chrome-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
-            { src: 'maskable-icon-x512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+            { src: 'maskable_icon_x512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
             { src: 'maskable_icon_x48.png', sizes: "48x48", type: "image/png", purpose: "maskable" },
             { src: 'maskable_icon_x72.png', sizes: "72x72", type: "image/png", purpose: "maskable" },
             { src: 'maskable_icon_x96.png', sizes: "96x96", type: "image/png", purpose: "maskable" },
@@ -73,8 +80,22 @@ export default defineConfig({
             icons: [{ src: 'favicon-96x96.png', sizes: '96x96' }]
           } 
         ],
-
         orientation: 'portrait-primary',
+        launch_handler: {
+          client_mode: 'navigate-existing'
+        },
+        note_taking: {
+          new_note_url: '/create'
+        },
+        file_handlers: [
+          {
+            action: '/create',
+            accept: {
+              'text/markdown': ['.md'],
+              'text/plain': ['.txt']
+            }
+          }
+        ],
         screenshots: [
           {
             "src": "screenshot-desktop-1.png",
@@ -101,7 +122,7 @@ export default defineConfig({
             "src": "screenshot-mobile-2.png",
             "sizes": "540x720",
             "type": "image/png",
-            "form_factor": "narrow", // For mobile (or omit form_factor)
+            "form_factor": "narrow",
             "label": "Mobile Settings View"
           }
         ],
