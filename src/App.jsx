@@ -7,13 +7,14 @@ import { ToastProvider, useToast } from './contexts/ToastContext';
 import { NotesProvider, useNotes } from './contexts/NotesContext';
 import { useOnlineStatus } from './contexts/OnlineStatusContext';
 import { OfflineBadge } from './components/OfflineBadge';
-import ViewNote from './pages/note/view/[id]';
-import Home from './pages/home';
-import Login from './pages/login'; 
-import AuthCallback from './pages/auth/callback';
-import Settings from './pages/settings';
+// Lazy load all page components for better code splitting
+const ViewNote = lazy(() => import('./pages/note/view/[id]'));
+const Home = lazy(() => import('./pages/home'));
+const Login = lazy(() => import('./pages/login'));
+const AuthCallback = lazy(() => import('./pages/auth/callback'));
+const Settings = lazy(() => import('./pages/settings'));
 const SectionView = lazy(() => import('./pages/section/[id]'));
-import NoteEditor from './pages/note/NoteEditor';
+const NoteEditor = lazy(() => import('./pages/note/NoteEditor'));
 import ErrorBoundary from './components/ErrorBoundary';
 import ProgressBar from './components/ProgressBar';
 import PWAReloadPrompt from './components/PWAReloadPrompt';
@@ -167,7 +168,7 @@ function AppContent({ session, isAuthLoading, isInitialLoad, setIsInitialLoad })
     <ErrorBoundary fallback={<div>Something went wrong! Try refreshing.</div>}>
 
       <Suspense
-        fallback={null}
+        fallback={<ProgressBar progress={50} message="Loading..." />}
       >
         <AutoBackupWatcher session={session} />
         <Routes>

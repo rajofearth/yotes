@@ -137,7 +137,8 @@ self.addEventListener('message', event => {
   }
   
   if (event.data && event.data.type === 'GET_VERSION') {
-    event.ports[0].postMessage({ version: self.__WB_MANIFEST[0] });
+    // Return a simple version identifier
+    event.ports[0].postMessage({ version: '1.0.0' });
   }
 });
 
