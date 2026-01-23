@@ -1,6 +1,6 @@
 # Yotes
 
-Yotes is a privacy-first notes application with real-time sync powered by Convex and authentication via Supabase. Built with a sleek, dark-themed interface using React and Tailwind CSS, Yotes keeps your notes, tags, and AI settings in your own Convex database with per-user access control. Check out the live site at [yotes.vercel.app](https://yotes.vercel.app).
+Yotes is a privacy-first notes application with real-time sync powered by Convex and authentication via Better Auth. Built with a sleek, dark-themed interface using React and Tailwind CSS, Yotes keeps your notes, tags, and AI settings in your own Convex database with per-user access control. Check out the live site at [yotes.vercel.app](https://yotes.vercel.app).
 
 ## Vision
 
@@ -17,7 +17,7 @@ Yotes prioritizes user privacy and control by keeping data in a secure, real-tim
 - **Search & Filter**: Quickly find notes by content or tags.
 - **Activity Heatmap**: Visualize note creation over the past year in the Settings page.
 - **Responsive Design**: Works seamlessly on desktop and mobile.
-- **Google OAuth**: Secure sign-in via Supabase authentication.
+- **Google OAuth**: Secure sign-in via Better Auth (Convex component).
 - **Dark Theme**: Default dark mode with JetBrains Mono font for a developer-friendly experience.
 - **Toast Notifications**: Real-time feedback for actions like saving or errors.
 - **Offline Access**: Work with notes offline; changes sync upon reconnection.
@@ -47,7 +47,7 @@ From Yashraj’s rough TODO list, here’s what’s in the pipeline:
 - **Frontend**: React, React Router, Vite
 - **Styling**: Tailwind CSS, shadcn/ui, Lucide icons
 - **Backend**: Convex (database, server functions, actions)
-- **Auth**: Supabase Auth (Google OAuth)
+- **Auth**: Better Auth + Convex component (Google OAuth)
 - **Offline & PWA**: IndexedDB (local cache for session/migration), Workbox (PWA/service worker)
 - **AI**: Google Gemini API (proxied via Convex actions)
 - **State Management**: React Contexts (NotesContext, ToastContext, ThemeContext)
@@ -58,8 +58,8 @@ From Yashraj’s rough TODO list, here’s what’s in the pipeline:
 
 - Node.js (v18+ recommended)
 - Google account for OAuth
-- Supabase project with Google OAuth configured
-- `.env` file with Supabase credentials
+- Google OAuth credentials configured for Better Auth
+- Convex deployment with Better Auth env variables
 
 ## Installation
 
@@ -77,10 +77,10 @@ From Yashraj’s rough TODO list, here’s what’s in the pipeline:
 3. **Set Up Environment Variables**
    Create a `.env` file in the root:
    ```
-   VITE_SUPABASE_URL=your-supabase-url
-   VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
+   VITE_CONVEX_URL=your-convex-url
+   VITE_CONVEX_SITE_URL=your-convex-site-url
    ```
-   - Get these from your Supabase project dashboard.
+   - Get these from your Convex dashboard and deployment settings.
 
 4. **Run Locally**
    ```bash

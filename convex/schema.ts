@@ -19,6 +19,16 @@ export default defineSchema({
     .index("byExternalId", ["externalId"]) 
     .index("byEmail", ["email"]),
 
+  userIdMap: defineTable({
+    oldExternalId: v.string(),
+    newExternalId: v.string(),
+    userId: v.id("users"),
+    createdAt: v.number(),
+  })
+    .index("byOldExternalId", ["oldExternalId"])
+    .index("byNewExternalId", ["newExternalId"])
+    .index("byUserId", ["userId"]),
+
   tags: defineTable({
     userId: v.id("users"),
     nameEnc: v.object({ ct: v.string(), iv: v.string() }),

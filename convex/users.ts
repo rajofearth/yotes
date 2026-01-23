@@ -14,11 +14,11 @@ export const ensure = mutation({
     wrappedDekIvB64: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const now = Date.now();
     const existing = await ctx.db
       .query("users")
       .withIndex("byExternalId", (q) => q.eq("externalId", args.externalId))
       .unique();
-    const now = Date.now();
     if (existing) {
       await ctx.db.patch(existing._id, {
         email: args.email,
@@ -33,6 +33,36 @@ export const ensure = mutation({
       });
       return existing._id;
     }
+
+    const existingByEmail = await ctx.db
+      .query("users")
+      .withIndex("byEmail", (q) => q.eq("email", args.email))
+      .unique();
+    if (existingByEmail) {
+      const oldExternalId = existingByEmail.externalId;
+      await ctx.db.patch(existingByEmail._id, {
+        externalId: args.externalId,
+        displayName: args.displayName ?? existingByEmail.displayName,
+        avatarUrl: args.avatarUrl ?? existingByEmail.avatarUrl,
+        encSaltB64: args.encSaltB64 ?? existingByEmail.encSaltB64,
+        encIterations: args.encIterations ?? existingByEmail.encIterations,
+        wrappedDekB64: args.wrappedDekB64 ?? existingByEmail.wrappedDekB64,
+        wrappedDekIvB64: args.wrappedDekIvB64 ?? existingByEmail.wrappedDekIvB64,
+        updatedAt: now,
+      });
+
+      if (oldExternalId !== args.externalId) {
+        await ctx.db.insert("userIdMap", {
+          oldExternalId,
+          newExternalId: args.externalId,
+          userId: existingByEmail._id,
+          createdAt: now,
+        });
+      }
+
+      return existingByEmail._id;
+    }
+
     const id = await ctx.db.insert("users", {
       externalId: args.externalId,
       email: args.email,
@@ -132,6 +162,88 @@ export const setMigrationDone = mutation({
     if (!user) throw new Error("User not found");
     await ctx.db.patch(userId, { migrationDone: true, updatedAt: Date.now() } as any);
     return { ok: true };
+  },
+});
+
+export const listAllUsersForMigration = query({
+  args: { adminToken: v.string() },
+  handler: async (ctx, { adminToken }) => {
+    const expected = process.env.MIGRATION_ADMIN_TOKEN;
+    if (!expected || adminToken !== expected) {
+      throw new Error("Forbidden");
+    }
+    return await ctx.db.query("users").collect();
+  },
+});
+
+export const migrateExternalIds = mutation({
+  args: {
+    adminToken: v.string(),
+    mappings: v.array(
+      v.object({
+        oldExternalId: v.string(),
+        newExternalId: v.string(),
+      }),
+    ),
+  },
+  handler: async (ctx, { adminToken, mappings }) => {
+    const expected = process.env.MIGRATION_ADMIN_TOKEN;
+    if (!expected || adminToken !== expected) {
+      throw new Error("Forbidden");
+    }
+
+    const results: Array<{
+      oldExternalId: string;
+      newExternalId: string;
+      status: "updated" | "missing" | "conflict";
+    }> = [];
+
+    const now = Date.now();
+    for (const mapping of mappings) {
+      const existingNew = await ctx.db
+        .query("users")
+        .withIndex("byExternalId", (q) => q.eq("externalId", mapping.newExternalId))
+        .unique();
+      if (existingNew) {
+        results.push({
+          oldExternalId: mapping.oldExternalId,
+          newExternalId: mapping.newExternalId,
+          status: "conflict",
+        });
+        continue;
+      }
+
+      const user = await ctx.db
+        .query("users")
+        .withIndex("byExternalId", (q) => q.eq("externalId", mapping.oldExternalId))
+        .unique();
+      if (!user) {
+        results.push({
+          oldExternalId: mapping.oldExternalId,
+          newExternalId: mapping.newExternalId,
+          status: "missing",
+        });
+        continue;
+      }
+
+      await ctx.db.patch(user._id, {
+        externalId: mapping.newExternalId,
+        updatedAt: now,
+      });
+      await ctx.db.insert("userIdMap", {
+        oldExternalId: mapping.oldExternalId,
+        newExternalId: mapping.newExternalId,
+        userId: user._id,
+        createdAt: now,
+      });
+      results.push({
+        oldExternalId: mapping.oldExternalId,
+        newExternalId: mapping.newExternalId,
+        status: "updated",
+      });
+    }
+
+    return { ok: true, results };
   },
 });
 

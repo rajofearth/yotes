@@ -1,8 +1,6 @@
 import React, { Suspense, lazy, useEffect, useState, useRef } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Analytics } from '@vercel/analytics/react';
-import { supabase } from './utils/supabaseClient';
-import { findSupabaseLocalStorageKey } from './hooks/useSettings';
 import { ToastProvider, useToast } from './contexts/ToastContext';
 import { NotesProvider, useNotes } from './contexts/NotesContext';
 import { useOnlineStatus } from './contexts/OnlineStatusContext';
@@ -19,6 +17,8 @@ import ProgressBar from './components/ProgressBar';
 import PWAReloadPrompt from './components/PWAReloadPrompt';
 import SyncButton from './components/SyncButton';
 import AutoBackupWatcher from './components/AutoBackupWatcher.jsx';
+import { authClient } from './lib/auth-client';
+import { getFromDB, openDB, setInDB } from './utils/indexedDB';
 
 function AppContent({ session, isAuthLoading, isInitialLoad, setIsInitialLoad }) {
   const isOnline = useOnlineStatus();
@@ -190,66 +190,59 @@ function AppContent({ session, isAuthLoading, isInitialLoad, setIsInitialLoad })
 
 function App() {
   const isOnline = useOnlineStatus();
-  const [session, setSession] = useState(null);
-  const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const sessionState = authClient.useSession();
+  const session = sessionState.data ?? null;
+  const isAuthLoading = sessionState.isPending;
   const [isInitialLoad, setIsInitialLoad] = useState(true); // Tracks the whole sequence
-
-  // Check for cached Supabase session in localStorage
-  const supabaseStorageKey = findSupabaseLocalStorageKey();
-  const hasLocalSession = supabaseStorageKey ? localStorage.getItem(supabaseStorageKey) : false;
+  const [hasLocalSession, setHasLocalSession] = useState(false);
+  const [cachedSession, setCachedSession] = useState(null);
+  const previousSessionRef = useRef(null);
 
   useEffect(() => {
     let mounted = true;
-    // Check initial session
-    supabase.auth
-      .getSession()
-      .then(({ data: { session: currentSession }, error }) => {
-        if (mounted) {
-          if (error) console.error('App: Error fetching initial session:', error);
-          setSession(currentSession);
-          // Only set isInitialLoad true if there *is* a session to load data for
-          setIsInitialLoad(!!currentSession || !!hasLocalSession);
-          setIsAuthLoading(false);
-        }
-      })
-      .catch((err) => {
-        if (mounted) {
-          console.error('App: Exception fetching initial session:', err);
-          setSession(null); setIsAuthLoading(false); setIsInitialLoad(false);
-        }
-      });
+    const loadCachedSession = async () => {
+      try {
+        await openDB();
+        const cachedSession = await getFromDB('sessions', 'session');
+        if (!mounted) return;
+        setHasLocalSession(Boolean(cachedSession?.user));
+        setCachedSession(cachedSession ?? null);
+      } catch {
+        if (mounted) setHasLocalSession(false);
+      }
+    };
+    loadCachedSession();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
-    // Listen for auth changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, newSession) => {
-      if (!mounted) return;
+  useEffect(() => {
+    const currentSession = session ?? cachedSession;
+    const wasAuth = Boolean(previousSessionRef.current);
+    const isAuth = Boolean(currentSession);
 
-      setSession(prevSession => {
-        const wasAuth = !!prevSession;
-        const isAuth = !!newSession;
+    if (!isAuthLoading) {
+      if (!wasAuth && isAuth) {
+        setIsInitialLoad(true);
+      } else if (!isAuth) {
+        setIsInitialLoad(false);
+      }
+    }
 
-        setIsAuthLoading(false); // Auth state confirmed
+    previousSessionRef.current = currentSession;
+  }, [session, cachedSession, isAuthLoading]);
 
-        if (event === 'SIGNED_IN' && !wasAuth && isAuth) {
-          // Only trigger initial load on real auth transition from logged out -> logged in
-          setIsInitialLoad(true);
-        } else if (event === 'SIGNED_OUT') {
-          setIsInitialLoad(false); // Stop load sequence on sign-out
-        } else if (event === 'TOKEN_REFRESH_FAILED') {
-          console.warn('Supabase token refresh failed, you might need to re-login');
-        }
-        // Ignore token refreshes or redundant SIGNED_IN events to avoid flashing the progress UI
+  useEffect(() => {
+    if (!session) return;
+    setInDB('sessions', 'session', session).catch(() => {});
+    setCachedSession(session);
+  }, [session]);
 
-        return newSession;
-      });
-    });
-
-    return () => { mounted = false; subscription?.unsubscribe(); };
-  }, []); // Empty dependency array is correct here
+  const effectiveSession = session ?? cachedSession;
 
   // Early return for logged out + offline
-  if (!isAuthLoading && !session && !isOnline && !hasLocalSession) {
+  if (!isAuthLoading && !effectiveSession && !isOnline && !hasLocalSession) {
     return (
       <ToastProvider>
         <div className="min-h-screen bg-bg-primary flex flex-col items-center justify-center p-4 text-center">
@@ -268,9 +261,9 @@ function App() {
   return (
     <ToastProvider>
       <Router>
-          <NotesProvider session={!isAuthLoading ? session : undefined}>
+          <NotesProvider session={!isAuthLoading ? effectiveSession : undefined}>
             <AppContent
-              session={session}
+              session={effectiveSession}
               isAuthLoading={isAuthLoading}
               isInitialLoad={isInitialLoad}
               setIsInitialLoad={setIsInitialLoad}

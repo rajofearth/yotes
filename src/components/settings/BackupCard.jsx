@@ -21,7 +21,7 @@ export default function BackupCard({ user }) {
   const profile = useMemo(() => ({
     externalId: user?.id || null,
     email: user?.email || null,
-    displayName: user?.user_metadata?.name || null,
+    displayName: user?.name || null,
   }), [user]);
 
   const doBackup = useCallback(async (kind) => {

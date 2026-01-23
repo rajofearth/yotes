@@ -15,6 +15,7 @@ export const AccountDetailsCard = ({ user }) => {
   const setAvatar = useMutation(api.users.setAvatar);
   const { convexUserId } = useNotes();
   const currentAvatar = useQuery(api.users.getAvatarUrl, user?.id ? { externalId: user.id } : 'skip');
+  const joinedAt = user?.createdAt ?? user?.created_at;
 
   const onChooseFile = () => fileInputRef.current?.click();
 
@@ -113,7 +114,7 @@ export const AccountDetailsCard = ({ user }) => {
             </div>
             <div className="space-y-0.5">
               <p className="text-xs text-text-primary/60">Name</p>
-              <p className="text-sm font-medium">{user?.user_metadata?.name || 'Not set'}</p>
+              <p className="text-sm font-medium">{user?.name || 'Not set'}</p>
             </div>
           </div>
 
@@ -123,7 +124,7 @@ export const AccountDetailsCard = ({ user }) => {
             </div>
             <div className="space-y-0.5">
               <p className="text-xs text-text-primary/60">Joined</p>
-              <p className="text-sm font-medium">{user?.created_at ? new Date(user.created_at).toLocaleDateString() : 'Loading...'}</p>
+              <p className="text-sm font-medium">{joinedAt ? new Date(joinedAt).toLocaleDateString() : 'Loading...'}</p>
             </div>
           </div>
         </div>

@@ -1,23 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { supabase } from '../utils/supabaseClient';
 import { useNotes } from './useNotes';
 import { useToast } from '../contexts/ToastContext';
 import { getFromDB, setInDB, clearDB } from '../utils/indexedDB';
 import { useOnlineStatus } from '../contexts/OnlineStatusContext';
 import { useAISettings } from './useAISettings';
-
-export const findSupabaseLocalStorageKey = () => {
-    if (typeof window === 'undefined' || !window.localStorage) return null;
-    for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && key.startsWith('sb-') && key.endsWith('-auth-token')) return key;
-    } return null;
-};
+import { authClient } from '../lib/auth-client';
 
 export const useSettings = () => {
     const showToast = useToast();
-    const navigate = useNavigate();
     const isOnline = useOnlineStatus();
     const { notes, tags, createTag, updateTag, deleteTag } = useNotes();
     const { 
@@ -28,6 +18,8 @@ export const useSettings = () => {
         saveApiKey, 
         refreshAISettings 
     } = useAISettings();
+    const sessionState = authClient.useSession();
+    const session = sessionState.data ?? null;
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState({ logout: false, delete: false, tagDelete: false, user: true, ai: false });
     const [tagState, setTagState] = useState({ newName: '', newColor: 'bg-purple-600/20 text-purple-600', editingId: null, editingName: '', editingColor: '', tagToDelete: null });
@@ -35,7 +27,7 @@ export const useSettings = () => {
 
     const signOutAndClear = useCallback(async () => {
         showToast('Session expired or invalid. Signing out.', 'error');
-        try { await supabase.auth.signOut(); await clearDB(); const key = findSupabaseLocalStorageKey(); if (key && typeof window !== 'undefined') localStorage.removeItem(key); }
+        try { await authClient.signOut(); await clearDB(); }
         catch (e) { console.error("Error during sign out and clear:", e); }
     }, [showToast]);
 
@@ -48,30 +40,18 @@ export const useSettings = () => {
             try {
                  cachedSession = await getFromDB('sessions', 'session');
                  if (cachedSession?.user) { cachedUser = cachedSession.user; if (isMounted) setUser(cachedUser); }
-                 if (isOnline) {
-                     const { data, error } = await supabase.auth.getUser();
-                     if (error) {
-                          if (error.message.includes('token is expired') || error.status === 401) {
-                              const { error: refreshError } = await supabase.auth.refreshSession();
-                               if (refreshError) throw new Error('Session refresh failed');
-                               const { data: retryData, error: retryError } = await supabase.auth.getUser();
-                               if (retryError) throw new Error('Failed to fetch user after refresh');
-                               if (isMounted) setUser(retryData.user);
-                                if (cachedSession && JSON.stringify(retryData.user) !== JSON.stringify(cachedUser)) {
-                                    await setInDB('sessions', 'session', { ...cachedSession, user: retryData.user });
-                                }
-                          } else throw error;
-                     } else if (data.user) {
-                          if (isMounted) setUser(data.user);
-                           if (cachedSession && JSON.stringify(data.user) !== JSON.stringify(cachedUser)) {
-                               await setInDB('sessions', 'session', { ...cachedSession, user: data.user });
-                           }
-                     } else { if (isMounted) setUser(null); if (cachedSession) await clearDB(); }
-                 } else if (!cachedUser && isMounted) { setUser(null); }
+                 if (isOnline && session?.user) {
+                     if (isMounted) setUser(session.user);
+                     if (cachedSession && JSON.stringify(session.user) !== JSON.stringify(cachedUser)) {
+                         await setInDB('sessions', 'session', { ...cachedSession, user: session.user });
+                     }
+                 } else if (!cachedUser && isMounted) {
+                     setUser(null);
+                 }
             } catch (error) {
                  console.error('useSettings: Error fetching user:', error.message);
                  if (isMounted) {
-                      if (error.message.includes('Session refresh failed') || error.message.includes('Failed to fetch user after refresh')) { await signOutAndClear(); }
+                      if (sessionState.error) { await signOutAndClear(); }
                       else if (!cachedUser) { setUser(null); } // Only nullify if no cache fallback
                       showToast('Could not verify user details.', 'error');
                  }
@@ -79,7 +59,7 @@ export const useSettings = () => {
         };
         fetchUser();
         return () => { isMounted = false; };
-    }, [isOnline, showToast, signOutAndClear]);
+    }, [isOnline, showToast, signOutAndClear, session, sessionState.error]);
 
     useEffect(() => {
         const activity = notes.map(note => ({ date: new Date(note.createdAt).toISOString().split('T')[0], count: 1 }))
@@ -93,14 +73,13 @@ export const useSettings = () => {
         try { 
             // Delete IndexedDB first
             await clearDB().catch(e => console.error("Clear DB error on logout:", e));
-            const { error } = await supabase.auth.signOut(); 
-            if (error) throw error; 
+            const { error } = await authClient.signOut();
+            if (error) throw error;
             success = true; 
         }
         catch(error) { showToast('Failed to log out', 'error'); console.error("Logout error:", error); }
         if(success) {
             showToast('Logged out successfully.', 'success');
-            const key = findSupabaseLocalStorageKey(); if (key && typeof window !== 'undefined') localStorage.removeItem(key);
         }
         setLoading(prev => ({ ...prev, logout: false }));
         // App handles redirect

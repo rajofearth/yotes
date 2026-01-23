@@ -10,7 +10,6 @@ import {
     DropdownMenuSeparator
 } from "../ui/dropdown-menu";
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../../utils/supabaseClient';
 import { getFromDB, setInDB, openDB } from '../../utils/indexedDB';
 import { useOnlineStatus } from '../../contexts/OnlineStatusContext';
 import { useSettings } from '../../hooks/useSettings';
@@ -22,6 +21,7 @@ import { Badge } from '../ui/badge';
 import { useNotes } from '../../hooks/useNotes';
 import { useQuery } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
+import { authClient } from '../../lib/auth-client';
 
 export default function NavBar({ onSearch }) {
   const navigate = useNavigate();
@@ -30,6 +30,8 @@ export default function NavBar({ onSearch }) {
   const isOnline = useOnlineStatus();
   const { handleLogout } = useSettings();
   const { aiSettings, loading: isLoadingAISettings } = useAISettings();
+  const sessionState = authClient.useSession();
+  const session = sessionState.data ?? null;
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
   const showToast = useToast();
   const { isE2EEReady, lockNotes } = useNotes();
@@ -58,21 +60,13 @@ export default function NavBar({ onSearch }) {
           if (isMounted) setUser(sessionUser);
         }
 
-        if (isOnline) {
-          const { data, error } = await supabase.auth.getUser();
-          if (error) {
-             console.error('NavBar: Supabase getUser error:', error);
-             if (!sessionUser && isMounted) setUser(null);
-          } else if (data.user) {
-             if (isMounted) setUser(data.user);
-             if (cachedSession && JSON.stringify(data.user) !== JSON.stringify(sessionUser)) {
-                await setInDB('sessions', 'session', { ...cachedSession, user: data.user });
-             }
-          } else {
-              if (isMounted) setUser(null);
+        if (isOnline && session?.user) {
+          if (isMounted) setUser(session.user);
+          if (cachedSession && JSON.stringify(session.user) !== JSON.stringify(sessionUser)) {
+            await setInDB('sessions', 'session', { ...cachedSession, user: session.user });
           }
         } else if (!sessionUser && isMounted) {
-           setUser(null);
+          setUser(null);
         }
       } catch (error) {
         console.error('NavBar: Failed to load user data:', error);
@@ -83,7 +77,7 @@ export default function NavBar({ onSearch }) {
     };
     fetchUser();
     return () => { isMounted = false };
-  }, [isOnline]);
+  }, [isOnline, session]);
 
   const profilePicture = convexAvatar?.url ?? null;
 

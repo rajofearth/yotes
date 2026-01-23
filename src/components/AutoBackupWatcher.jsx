@@ -18,7 +18,7 @@ export default function AutoBackupWatcher({ session }) {
   const profile = {
     externalId: session?.user?.id || null,
     email: session?.user?.email || null,
-    displayName: session?.user?.user_metadata?.full_name || null,
+    displayName: session?.user?.name || null,
   };
 
   const maybeRunAuto = useCallback(async () => {

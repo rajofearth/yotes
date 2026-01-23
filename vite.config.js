@@ -15,6 +15,7 @@ export default defineConfig({
       // --- Service Worker Caching (Workbox) ---
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,webmanifest}'],
+        navigateFallbackAllowlist: [/^\/$/, /^\/\?ott=/],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
@@ -25,6 +26,14 @@ export default defineConfig({
             urlPattern: /^https:\/\/fonts\.gstatic\.com\/.*/i,
             handler: 'CacheFirst',
             options: { cacheName: 'google-fonts-gstatic', expiration: { maxEntries: 10, maxAgeSeconds: 31536000 }, cacheableResponse: { statuses: [0, 200] } }
+          },
+          // Allow Better Auth one-time-token redirects to resolve
+          {
+            urlPattern: ({ url }) =>
+              url.origin === self.location.origin &&
+              url.pathname === '/' &&
+              url.searchParams.has('ott'),
+            handler: 'NetworkFirst',
           },
           // Do NOT cache app shell routes that may render decrypted content
           {
@@ -38,7 +47,7 @@ export default defineConfig({
 
       // --- Development Options ---
       devOptions: {
-        enabled: true,
+        enabled: false,
         type: 'module'
       },
 

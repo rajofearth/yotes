@@ -7,29 +7,12 @@ const DRIVE_API = 'https://www.googleapis.com/drive/v3';
 
 export const getAccessToken = async (): Promise<string | null> => {
   try {
-    const { supabase } = await import('../utils/supabaseClient');
-    // 1) Try current session
-    let { data } = await (supabase as any).auth.getSession();
-    let token: string | undefined = data?.session?.provider_token;
-    if (token) return token;
-
-    // 2) Attempt refresh
-    try {
-      await (supabase as any).auth.refreshSession();
-      ({ data } = await (supabase as any).auth.getSession());
-      token = data?.session?.provider_token;
-      if (token) return token;
-    } catch {}
-
-    // 3) Fallback to stored session from IndexedDB (auth/callback persists it)
-    try {
-      const { getFromDB } = await import('../utils/indexedDB.js');
-      const storedSession: any = await (getFromDB as any)('sessions', 'session');
-      const storedToken: string | undefined = storedSession?.provider_token;
-      if (storedToken) return storedToken;
-    } catch {}
-
-    return null;
+    const { authClient } = await import('../lib/auth-client');
+    const { data, error } = await authClient.getAccessToken({
+      providerId: 'google',
+    });
+    if (error) return null;
+    return data?.accessToken ?? null;
   } catch {
     return null;
   }

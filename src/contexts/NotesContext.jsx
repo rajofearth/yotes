@@ -47,8 +47,8 @@ export function NotesProvider({ children, session }) {
                 const id = await ensureUser({
                     externalId: session.user.id,
                     email: session.user.email ?? 'unknown@example.com',
-                    displayName: session.user.user_metadata?.full_name ?? undefined,
-                    avatarUrl: session.user.user_metadata?.avatar_url ?? undefined,
+                    displayName: session.user.name ?? undefined,
+                    avatarUrl: session.user.image ?? undefined,
                 });
                 setConvexUserId(id);
                 setLoadingState({ progress: 60, message: 'Preparing encryption...' });
@@ -122,8 +122,8 @@ export function NotesProvider({ children, session }) {
                         await ensureUser({
                             externalId: session.user.id,
                             email: session.user.email ?? 'unknown@example.com',
-                            displayName: session.user.user_metadata?.full_name ?? undefined,
-                            avatarUrl: session.user.user_metadata?.avatar_url ?? undefined,
+                            displayName: session.user.name ?? undefined,
+                            avatarUrl: session.user.image ?? undefined,
                             encSaltB64: saltB64,
                             encIterations: iterations,
                             wrappedDekB64,
