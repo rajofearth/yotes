@@ -1,12 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useOnlineStatus } from '../contexts/OnlineStatusContext';
-import { useMutation, useQuery } from 'convex/react';
+import { useMutation, useQuery, useConvexAuth } from 'convex/react';
 import { encryptString } from '../lib/e2ee';
 import { useNotes } from '../contexts/NotesContext';
 import { api } from '../../convex/_generated/api';
 
 export const useAISettings = () => {
-  const isOnline = useOnlineStatus();
+  const { isAuthenticated } = useConvexAuth();
   // Get Convex userId for AI settings operations
   const { convexUserId } = useNotes();
   const [aiSettings, setAiSettings] = useState({
@@ -15,10 +14,20 @@ export const useAISettings = () => {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const getSettings = useQuery(api.ai.getSettings, convexUserId ? { userId: convexUserId } : 'skip');
+  const getSettings = useQuery(
+    api.ai.getSettings,
+    convexUserId && isAuthenticated ? { userId: convexUserId } : 'skip'
+  );
   const saveSettings = useMutation(api.ai.saveSettings);
 
   const loadAISettings = useCallback(async () => {
+    setLoading(true);
+    if (!isAuthenticated || !convexUserId) {
+      setAiSettings({ enabled: false, apiKey: null });
+      setError(null);
+      setLoading(false);
+      return;
+    }
     try {
       if (getSettings) {
         setAiSettings(getSettings);
@@ -29,11 +38,14 @@ export const useAISettings = () => {
     } finally {
       setLoading(false);
     }
-  }, [getSettings]);
+  }, [getSettings, isAuthenticated, convexUserId]);
 
   const updateSessionCache = async () => {};
 
   const saveAISettings = useCallback(async (newSettings) => {
+    if (!isAuthenticated) {
+      throw new Error('Not authenticated');
+    }
     if (!convexUserId) {
       throw new Error('User not authenticated for AI settings');
     }
@@ -54,7 +66,7 @@ export const useAISettings = () => {
       setError('Failed to save AI settings');
       throw err;
     }
-  }, [saveSettings, convexUserId, aiSettings.apiKey]);
+  }, [saveSettings, convexUserId, aiSettings.apiKey, isAuthenticated]);
 
   // Toggle AI features
   const toggleAiFeatures = useCallback(async (enabled) => {

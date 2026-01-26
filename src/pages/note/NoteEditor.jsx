@@ -10,6 +10,7 @@ import { generateNoteFromImage } from '../../utils/aiImageService';
 import { Skeleton } from '../../components/ui/skeleton';
 import { getFromDB, setInDB } from '../../utils/indexedDB';
 import { encryptString, decryptString } from '../../lib/e2ee';
+import { useConvexAuth } from 'convex/react';
 
 export default function NoteEditor() {
   const { id: noteId } = useParams(); // Get note ID from params (if editing)
@@ -17,6 +18,7 @@ export default function NoteEditor() {
   const location = useLocation();
   const { createNote, updateNote, notes, tags, createTag, isLoading: isNotesLoading, allTags, convexUserId, isE2EEReady } = useNotes();
   const showToast = useToast();
+  const { isAuthenticated } = useConvexAuth();
 
   const [isSaving, setIsSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
@@ -45,7 +47,10 @@ export default function NoteEditor() {
     imageInFlightRef.current = true;
     setIsImportingImage(true);
     try {
-      const fields = await generateNoteFromImage(file, convexUserId);
+      if (!isAuthenticated) {
+        throw new Error('Not authenticated');
+      }
+      const fields = await generateNoteFromImage(file, convexUserId, isAuthenticated);
       // Update note with returned fields
       setNote(prev => ({
         ...prev,
@@ -63,7 +68,7 @@ export default function NoteEditor() {
       imageInFlightRef.current = false;
       setIsImportingImage(false);
     }
-  }, [showToast, setNote, setHasChanges, convexUserId]);
+  }, [showToast, setNote, setHasChanges, convexUserId, isAuthenticated]);
 
   // Handle image data passed from image upload modal
   useEffect(() => {

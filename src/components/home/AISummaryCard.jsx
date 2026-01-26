@@ -7,6 +7,7 @@ import { Badge } from '../ui/badge';
 import { generateSearchSummary } from '../../utils/aiSummaryService';
 import { useNotes } from '../../contexts/NotesContext';
 import { useToast } from '../../contexts/ToastContext';
+import { useConvexAuth } from 'convex/react';
 
 export const AISummaryCard = ({ 
   notes, 
@@ -19,6 +20,7 @@ export const AISummaryCard = ({
   const [error, setError] = useState(null);
   const [expanded, setExpanded] = useState(true);
   const showToast = useToast();
+  const { isAuthenticated } = useConvexAuth();
 
   // Get current user's Convex ID for AI requests
   const { convexUserId } = useNotes();
@@ -36,7 +38,15 @@ export const AISummaryCard = ({
     setLoading(true);
     setError(null);
     try {
-      const summaryData = await generateSearchSummary(notes, searchQuery, convexUserId);
+      if (!isAuthenticated) {
+        throw new Error('Not authenticated');
+      }
+      const summaryData = await generateSearchSummary(
+        notes,
+        searchQuery,
+        convexUserId,
+        isAuthenticated
+      );
       setSummary(summaryData);
       if (summaryData && summaryData._cached && !window.__yotesCacheToastShown) {
         window.__yotesCacheToastShown = true;
@@ -52,7 +62,7 @@ export const AISummaryCard = ({
       completedKeyRef.current = key;
       setLoading(false);
     }
-  }, [notes, searchQuery, convexUserId, showToast]);
+  }, [notes, searchQuery, convexUserId, showToast, isAuthenticated]);
 
   const handleCreateTag = (tagName) => {
     if (onCreateTag && tagName) {
@@ -73,7 +83,7 @@ export const AISummaryCard = ({
 
   // Debounce AI summary until user stops typing for a bit
   useEffect(() => {
-    if (!aiSettings?.enabled || !searchQuery || notes.length === 0) return;
+    if (!aiSettings?.enabled || !searchQuery || notes.length === 0 || !isAuthenticated) return;
     const key = requestKey;
     if (inFlightKeyRef.current === key || completedKeyRef.current === key) return;
     const TYPING_DELAY_MS = 800;
@@ -83,7 +93,7 @@ export const AISummaryCard = ({
       fetchSummary(key);
     }, TYPING_DELAY_MS);
     return () => clearTimeout(timer);
-  }, [aiSettings?.enabled, searchQuery, notes, requestKey, fetchSummary]);
+  }, [aiSettings?.enabled, searchQuery, notes, requestKey, fetchSummary, isAuthenticated]);
 
   // If no search query or no search results, don't show the card
   if (!searchQuery || notes.length === 0) {

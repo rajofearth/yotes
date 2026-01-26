@@ -1,11 +1,16 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
-import { authComponent } from "./auth";
 
 export const getSettings = query({
-  args: { userId: v.optional(v.id("users")) },
+  args: { userId: v.id("users") },
   handler: async (ctx, { userId }) => {
-    if (!userId) return { enabled: false, apiKey: null };
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthenticated");
+    const user = await ctx.db
+      .query("users")
+      .withIndex("byExternalId", (q) => q.eq("externalId", identity.subject))
+      .unique();
+    if (!user || user._id !== userId) throw new Error("Forbidden");
     const existing = await ctx.db
       .query("aiSettings")
       .withIndex("byUser", (q) => q.eq("userId", userId))
@@ -26,13 +31,11 @@ export const saveSettings = mutation({
     apiKeyEnc: v.optional(v.object({ ct: v.string(), iv: v.string() })),
   },
   handler: async (ctx, { userId, enabled, apiKey, apiKeyEnc }) => {
-    const authUser = await authComponent.getAuthUser(ctx);
-    if (!authUser?.user?.id) throw new Error("Unauthenticated");
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthenticated");
     const user = await ctx.db
       .query("users")
-      .withIndex("byExternalId", (q) =>
-        q.eq("externalId", authUser.user.id)
-      )
+      .withIndex("byExternalId", (q) => q.eq("externalId", identity.subject))
       .unique();
     if (!user || user._id !== userId) throw new Error("Forbidden");
     const existing = await ctx.db
@@ -64,12 +67,12 @@ export const getSettingsRaw = query({
   args: { userId: v.id("users") },
   handler: async (ctx, { userId }) => {
     const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return null;
+    if (!identity) throw new Error("Unauthenticated");
     const user = await ctx.db
       .query("users")
       .withIndex("byExternalId", (q) => q.eq("externalId", identity.subject))
       .unique();
-    if (!user || user._id !== userId) return null;
+    if (!user || user._id !== userId) throw new Error("Forbidden");
     const existing = await ctx.db
       .query("aiSettings")
       .withIndex("byUser", (q) => q.eq("userId", userId))
@@ -83,12 +86,12 @@ export const getSummaryCache = query({
   args: { userId: v.id("users"), cacheKey: v.string() },
   handler: async (ctx, { userId, cacheKey }) => {
     const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return null;
+    if (!identity) throw new Error("Unauthenticated");
     const user = await ctx.db
       .query("users")
       .withIndex("byExternalId", (q) => q.eq("externalId", identity.subject))
       .unique();
-    if (!user || user._id !== userId) return null;
+    if (!user || user._id !== userId) throw new Error("Forbidden");
     const row = await ctx.db
       .query("aiSummaries")
       .withIndex("byUserCacheKey", (q) => q.eq("userId", userId).eq("cacheKey", cacheKey))
@@ -107,13 +110,11 @@ export const putSummaryCache = mutation({
     ttlSeconds: v.optional(v.number()),
   },
   handler: async (ctx, { userId, cacheKey, summaryEnc, ttlSeconds }) => {
-    const authUser = await authComponent.getAuthUser(ctx);
-    if (!authUser?.user?.id) throw new Error("Unauthenticated");
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthenticated");
     const user = await ctx.db
       .query("users")
-      .withIndex("byExternalId", (q) =>
-        q.eq("externalId", authUser.user.id)
-      )
+      .withIndex("byExternalId", (q) => q.eq("externalId", identity.subject))
       .unique();
     if (!user || user._id !== userId) throw new Error("Forbidden");
     const now = Date.now();

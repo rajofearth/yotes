@@ -1,33 +1,36 @@
 import { convex } from '../lib/convexClient.tsx';
 import { api } from '../../convex/_generated/api';
-import { createGoogleGenerativeAI } from '@ai-sdk/google';
-import { generateObject } from 'ai';
 import { z } from 'zod';
 import { decryptString, encryptString } from '../lib/e2ee';
+import { generateGeminiObject } from '../services/aiSdk';
 
-const getAISettings = async (userId) => {
-  try {
-    if (!userId) return null;
-    const settingsRaw = await convex.query(api.ai.getSettingsRaw, { userId });
-    if (!settingsRaw || !settingsRaw.enabled || !settingsRaw.apiKeyEnc) {
-      return { enabled: false, apiKey: null };
-    }
-    const dek = window.__yotesDek;
-    if (!dek) {
-      throw new Error('Encryption key not available');
-    }
-    const apiKey = await decryptString(dek, settingsRaw.apiKeyEnc);
-    return { enabled: settingsRaw.enabled, apiKey };
-  } catch (error) {
-    console.error('Error fetching AI settings:', error);
-    return null;
+const getAISettings = async (userId, isAuthenticated) => {
+  if (!isAuthenticated) {
+    throw new Error('Not authenticated');
   }
+  if (!userId) {
+    throw new Error('User not authenticated for AI settings');
+  }
+  const settingsRaw = await convex.query(api.ai.getSettingsRaw, { userId });
+  if (!settingsRaw || !settingsRaw.enabled || !settingsRaw.apiKeyEnc) {
+    return { enabled: false, apiKey: null };
+  }
+  const dek = window.__yotesDek;
+  if (!dek) {
+    throw new Error('Encryption key not available');
+  }
+  const apiKey = await decryptString(dek, settingsRaw.apiKeyEnc);
+  return { enabled: settingsRaw.enabled, apiKey };
 };
 
-export const canUseAIFeatures = async (isOnline, userId) => {
+export const canUseAIFeatures = async (isOnline, userId, isAuthenticated) => {
   if (!isOnline) return false;
-  const aiSettings = await getAISettings(userId);
-  return aiSettings && aiSettings.enabled && aiSettings.apiKey;
+  try {
+    const aiSettings = await getAISettings(userId, isAuthenticated);
+    return aiSettings.enabled && aiSettings.apiKey;
+  } catch {
+    return false;
+  }
 };
 
 const buildCacheKey = (searchResults, searchQuery) => {
@@ -35,8 +38,8 @@ const buildCacheKey = (searchResults, searchQuery) => {
   return `${searchQuery || ''}|${ids}`;
 };
 
-export const generateSearchSummary = async (searchResults, searchQuery, userId) => {
-  const aiSettings = await getAISettings(userId);
+export const generateSearchSummary = async (searchResults, searchQuery, userId, isAuthenticated) => {
+  const aiSettings = await getAISettings(userId, isAuthenticated);
   if (!aiSettings || !aiSettings.enabled || !aiSettings.apiKey) {
     throw new Error('AI features are not enabled');
   }
@@ -61,8 +64,6 @@ export const generateSearchSummary = async (searchResults, searchQuery, userId) 
     }
   } catch {}
 
-  const googleProvider = createGoogleGenerativeAI({ apiKey: aiSettings.apiKey });
-  const model = googleProvider('gemini-2.5-flash-lite');
   const formattedResults = searchResults.map(note => ({
     id: note.id,
     title: note.title,
@@ -80,8 +81,9 @@ export const generateSearchSummary = async (searchResults, searchQuery, userId) 
     `  "suggestedTags": string[]\n` +
     `}`;
 
-  const { object } = await generateObject({
-    model,
+  const { object } = await generateGeminiObject({
+    apiKey: aiSettings.apiKey,
+    model: 'gemini-2.5-flash-lite',
     schema: z.object({
       overview: z.string(),
       themes: z.array(z.string()),

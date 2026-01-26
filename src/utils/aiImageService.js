@@ -1,19 +1,15 @@
 import { getAISettings } from './aiSummaryService';
-import { createGoogleGenerativeAI } from '@ai-sdk/google';
-import { generateObject } from 'ai';
 import { z } from 'zod';
+import { generateGeminiObject } from '../services/aiSdk';
 
-export const generateNoteFromImage = async (file, userId) => {
-  const aiSettings = await getAISettings(userId);
+export const generateNoteFromImage = async (file, userId, isAuthenticated) => {
+  const aiSettings = await getAISettings(userId, isAuthenticated);
   if (!aiSettings || !aiSettings.enabled || !aiSettings.apiKey) {
     throw new Error('AI features are not enabled');
   }
 
   try {
     const arrayBuffer = await file.arrayBuffer();
-    const googleProvider = createGoogleGenerativeAI({ apiKey: aiSettings.apiKey });
-    const model = googleProvider('gemini-2.5-flash');
-
     const promptText = `Analyze the provided image and extract a note with the following fields:\n\n` +
       `1. title - A concise title based on the image content\n` +
       `2. description - A brief summary (2-3 sentences)\n` +
@@ -26,8 +22,9 @@ export const generateNoteFromImage = async (file, userId) => {
       content: z.string().min(1),
     });
 
-    const { object } = await generateObject({
-      model,
+    const { object } = await generateGeminiObject({
+      apiKey: aiSettings.apiKey,
+      model: 'gemini-2.5-flash',
       schema: NoteSchema,
       messages: [
         {
