@@ -10,8 +10,7 @@ import { generateNoteFromImage } from '../../utils/aiImageService';
 import { Skeleton } from '../../components/ui/skeleton';
 import { getFromDB, setInDB } from '../../utils/indexedDB';
 import { encryptString, decryptString } from '../../lib/e2ee';
-import { useConvexAuth } from 'convex/react';
-import { authClient } from '../../lib/auth-client';
+import { useAuthReady } from '../../hooks/useAuthReady';
 
 export default function NoteEditor() {
   const { id: noteId } = useParams(); // Get note ID from params (if editing)
@@ -19,9 +18,7 @@ export default function NoteEditor() {
   const location = useLocation();
   const { createNote, updateNote, notes, tags, createTag, isLoading: isNotesLoading, allTags, convexUserId, isE2EEReady } = useNotes();
   const showToast = useToast();
-  const { isAuthenticated } = useConvexAuth();
-  const sessionState = authClient.useSession();
-  const hasSession = Boolean(sessionState.data?.user?.id);
+  const { hasSession, isAuthReadyForData } = useAuthReady();
 
   const [isSaving, setIsSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
@@ -50,10 +47,13 @@ export default function NoteEditor() {
     imageInFlightRef.current = true;
     setIsImportingImage(true);
     try {
-      if (!isAuthenticated || !hasSession) {
+      if (!hasSession) {
         throw new Error('Not authenticated');
       }
-      const fields = await generateNoteFromImage(file, convexUserId, isAuthenticated && hasSession);
+      if (!isAuthReadyForData) {
+        throw new Error('Connecting to Convex...');
+      }
+      const fields = await generateNoteFromImage(file, convexUserId, isAuthReadyForData);
       // Update note with returned fields
       setNote(prev => ({
         ...prev,
@@ -71,7 +71,7 @@ export default function NoteEditor() {
       imageInFlightRef.current = false;
       setIsImportingImage(false);
     }
-  }, [showToast, setNote, setHasChanges, convexUserId, isAuthenticated, hasSession]);
+  }, [showToast, setNote, setHasChanges, convexUserId, hasSession, isAuthReadyForData]);
 
   // Handle image data passed from image upload modal
   useEffect(() => {

@@ -20,10 +20,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { useNotes } from '../hooks/useNotes';
-import { useConvex, useConvexAuth, useQuery } from 'convex/react';
+import { useConvex, useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { buildExportZip } from '../services/exporter';
-import { authClient } from '../lib/auth-client';
+import { useAuthReady } from '../hooks/useAuthReady';
 
 export default function Settings() {
     const {
@@ -55,12 +55,10 @@ export default function Settings() {
 
     const { convexUserId } = useNotes();
     const convex = useConvex();
-    const { isAuthenticated } = useConvexAuth();
-    const sessionState = authClient.useSession();
-    const hasSession = Boolean(sessionState.data?.user?.id);
+    const { hasSession, isAuthReadyForData } = useAuthReady();
     const rawAI = useQuery(
         api.ai.getSettingsRaw,
-        convexUserId && isAuthenticated && hasSession ? { userId: convexUserId } : 'skip'
+        convexUserId && isAuthReadyForData ? { userId: convexUserId } : 'skip'
     );
 
     const [exportPass, setExportPass] = useState('');
