@@ -11,6 +11,12 @@ if (!siteUrl) {
   throw new Error("Missing SITE_URL in env");
 }
 
+const betterAuthUrl = process.env.BETTER_AUTH_URL ?? siteUrl;
+const betterAuthSecret = process.env.BETTER_AUTH_SECRET;
+if (!betterAuthSecret) {
+  throw new Error("Missing BETTER_AUTH_SECRET in env");
+}
+
 const googleClientId = process.env.GOOGLE_CLIENT_ID;
 const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
 if (!googleClientId || !googleClientSecret) {
@@ -21,8 +27,11 @@ export const authComponent = createClient<DataModel>(components.betterAuth);
 
 export const createAuth = (ctx: GenericCtx<DataModel>) =>
   betterAuth({
-    baseURL: siteUrl,
-    trustedOrigins: [siteUrl],
+    baseURL: betterAuthUrl,
+    secret: betterAuthSecret,
+    trustedOrigins: [siteUrl, betterAuthUrl].filter(
+      (origin): origin is string => Boolean(origin),
+    ),
     database: authComponent.adapter(ctx),
     emailAndPassword: {
       enabled: false,
