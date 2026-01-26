@@ -20,7 +20,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { useNotes } from '../hooks/useNotes';
-import { useConvex, useQuery } from 'convex/react';
+import { useConvex, useConvexAuth, useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { buildExportZip } from '../services/exporter';
 
@@ -54,7 +54,11 @@ export default function Settings() {
 
     const { convexUserId } = useNotes();
     const convex = useConvex();
-    const rawAI = useQuery(api.ai.getSettingsRaw, convexUserId ? { userId: convexUserId } : 'skip');
+    const { isAuthenticated } = useConvexAuth();
+    const rawAI = useQuery(
+        api.ai.getSettingsRaw,
+        convexUserId && isAuthenticated ? { userId: convexUserId } : 'skip'
+    );
 
     const [exportPass, setExportPass] = useState('');
     const [exportBusy, setExportBusy] = useState(false);

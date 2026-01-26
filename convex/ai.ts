@@ -63,13 +63,11 @@ export const saveSettings = mutation({
 export const getSettingsRaw = query({
   args: { userId: v.id("users") },
   handler: async (ctx, { userId }) => {
-    const authUser = await authComponent.getAuthUser(ctx);
-    if (!authUser?.user?.id) return null;
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return null;
     const user = await ctx.db
       .query("users")
-      .withIndex("byExternalId", (q) =>
-        q.eq("externalId", authUser.user.id)
-      )
+      .withIndex("byExternalId", (q) => q.eq("externalId", identity.subject))
       .unique();
     if (!user || user._id !== userId) return null;
     const existing = await ctx.db
@@ -84,13 +82,11 @@ export const getSettingsRaw = query({
 export const getSummaryCache = query({
   args: { userId: v.id("users"), cacheKey: v.string() },
   handler: async (ctx, { userId, cacheKey }) => {
-    const authUser = await authComponent.getAuthUser(ctx);
-    if (!authUser?.user?.id) return null;
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return null;
     const user = await ctx.db
       .query("users")
-      .withIndex("byExternalId", (q) =>
-        q.eq("externalId", authUser.user.id)
-      )
+      .withIndex("byExternalId", (q) => q.eq("externalId", identity.subject))
       .unique();
     if (!user || user._id !== userId) return null;
     const row = await ctx.db
