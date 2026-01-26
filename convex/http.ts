@@ -14,11 +14,14 @@ const allowedOrigins = [siteUrl, ...additionalAllowedOrigins].filter(
 );
 
 authComponent.registerRoutes(http, createAuth, {
-  cors: {
-    allowedOrigins,
-    allowedHeaders: ["Content-Type", "Authorization", "Better-Auth-Cookie"],
-    exposedHeaders: ["Set-Better-Auth-Cookie"],
-  },
+  cors:
+    allowedOrigins.length > 0
+      ? {
+          allowedOrigins,
+          allowedHeaders: ["Content-Type", "Authorization", "Better-Auth-Cookie"],
+          exposedHeaders: ["Set-Better-Auth-Cookie"],
+        }
+      : true,
 });
 
 export default http;
