@@ -1,15 +1,19 @@
 import { useCallback, useEffect, useRef } from 'react';
-import { useConvex, useQuery } from 'convex/react';
+import { useConvex, useQuery, useConvexAuth } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { useNotes } from '../hooks/useNotes';
 import { runBackup } from '../services/backup';
 import { useToast } from '../contexts/ToastContext';
+import { authClient } from '../lib/auth-client';
 
 const SIX_HOURS = 6 * 60 * 60 * 1000;
 
 export default function AutoBackupWatcher({ session }) {
   const convex = useConvex();
   const showToast = useToast();
+  const { isAuthenticated } = useConvexAuth();
+  const sessionState = authClient.useSession();
+  const hasSession = Boolean(sessionState.data?.user?.id);
   const { convexUserId, isE2EEReady, notes, tags } = useNotes();
   const lastSuccessAt = useQuery(api.backups.getLastSuccessAt, convexUserId ? { userId: convexUserId } : 'skip');
   const lastRunRef = useRef(0);
@@ -22,7 +26,7 @@ export default function AutoBackupWatcher({ session }) {
   };
 
   const maybeRunAuto = useCallback(async () => {
-    if (!convexUserId || !isE2EEReady || runningRef.current) return;
+    if (!isAuthenticated || !hasSession || !convexUserId || !isE2EEReady || runningRef.current) return;
     const now = Date.now();
     if (now - lastRunRef.current < 60 * 1000) return; // throttle checks
     lastRunRef.current = now;
@@ -46,7 +50,7 @@ export default function AutoBackupWatcher({ session }) {
     } finally {
       runningRef.current = false;
     }
-  }, [convex, convexUserId, isE2EEReady, lastSuccessAt, notes, tags, profile, showToast]);
+  }, [convex, convexUserId, isE2EEReady, lastSuccessAt, notes, tags, profile, showToast, isAuthenticated, hasSession]);
 
   useEffect(() => {
     maybeRunAuto();

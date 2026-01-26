@@ -23,6 +23,7 @@ import { useNotes } from '../hooks/useNotes';
 import { useConvex, useConvexAuth, useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { buildExportZip } from '../services/exporter';
+import { authClient } from '../lib/auth-client';
 
 export default function Settings() {
     const {
@@ -55,9 +56,11 @@ export default function Settings() {
     const { convexUserId } = useNotes();
     const convex = useConvex();
     const { isAuthenticated } = useConvexAuth();
+    const sessionState = authClient.useSession();
+    const hasSession = Boolean(sessionState.data?.user?.id);
     const rawAI = useQuery(
         api.ai.getSettingsRaw,
-        convexUserId && isAuthenticated ? { userId: convexUserId } : 'skip'
+        convexUserId && isAuthenticated && hasSession ? { userId: convexUserId } : 'skip'
     );
 
     const [exportPass, setExportPass] = useState('');

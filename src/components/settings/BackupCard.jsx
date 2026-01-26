@@ -1,16 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useConvex, useQuery } from 'convex/react';
+import { useConvex, useQuery, useConvexAuth } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Clock, HardDriveUpload, RefreshCcw, CheckCircle2, XCircle } from 'lucide-react';
 import { useNotes } from '../../hooks/useNotes';
 import { runBackup } from '../../services/backup';
+import { authClient } from '../../lib/auth-client';
 
 const SIX_HOURS = 6 * 60 * 60 * 1000;
 
 export default function BackupCard({ user }) {
   const convex = useConvex();
+  const { isAuthenticated } = useConvexAuth();
+  const sessionState = authClient.useSession();
+  const hasSession = Boolean(sessionState.data?.user?.id);
   const { notes, tags, convexUserId, isE2EEReady } = useNotes();
   const [isBackingUp, setIsBackingUp] = useState(false);
   const [progress, setProgress] = useState('');
@@ -25,7 +29,7 @@ export default function BackupCard({ user }) {
   }), [user]);
 
   const doBackup = useCallback(async (kind) => {
-    if (!convexUserId || !isE2EEReady) return;
+    if (!isAuthenticated || !hasSession || !convexUserId || !isE2EEReady) return;
     setIsBackingUp(true);
     setProgress('Starting...');
     try {
@@ -44,10 +48,10 @@ export default function BackupCard({ user }) {
       setTimeout(() => setProgress(''), 3000);
       setIsBackingUp(false);
     }
-  }, [convex, convexUserId, isE2EEReady, notes, tags, profile]);
+  }, [convex, convexUserId, isE2EEReady, notes, tags, profile, isAuthenticated, hasSession]);
 
   useEffect(() => {
-    if (!convexUserId || !isE2EEReady) return;
+    if (!isAuthenticated || !hasSession || !convexUserId || !isE2EEReady) return;
     const now = Date.now();
     if (now - lastAutoCheckRef.current < 60 * 1000) return; // throttle check
     lastAutoCheckRef.current = now;
@@ -56,7 +60,7 @@ export default function BackupCard({ user }) {
     if (last && now - last >= SIX_HOURS) {
       doBackup('auto');
     }
-  }, [convexUserId, isE2EEReady, lastSuccessAt, doBackup]);
+  }, [convexUserId, isE2EEReady, lastSuccessAt, doBackup, isAuthenticated, hasSession]);
 
   return (
     <Card className="bg-overlay/5 border-overlay/10">
