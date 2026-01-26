@@ -6,6 +6,8 @@ import { Input } from '../ui/input';
 import { Button } from '../ui/button';
 import { Info, CheckCircle, AlertTriangle, Brain } from 'lucide-react';
 import { useOnlineStatus } from '../../contexts/OnlineStatusContext';
+import { useConvexAuth } from 'convex/react';
+import { authClient } from '../../lib/auth-client';
 
 // Custom Switch with more visible enabled/disabled state
 const ToggleSwitch = ({ checked, onChange, disabled }) => (
@@ -46,6 +48,11 @@ export const AIFeaturesCard = ({ aiSettings, onSaveApiKey, onToggleAiFeatures })
   const [isSaving, setIsSaving] = useState(false);
   const [status, setStatus] = useState(null);
   const isOnline = useOnlineStatus();
+  const { isAuthenticated, isLoading: isAuthLoading } = useConvexAuth();
+  const sessionState = authClient.useSession();
+  const hasSession = Boolean(sessionState.data?.user?.id);
+  const isSessionLoading = Boolean(sessionState.isPending);
+  const isAuthReady = isAuthenticated && hasSession;
 
   // Reset form when settings change
   useEffect(() => {
@@ -85,7 +92,7 @@ export const AIFeaturesCard = ({ aiSettings, onSaveApiKey, onToggleAiFeatures })
           <ToggleSwitch
             checked={aiSettings?.enabled || false}
             onChange={onToggleAiFeatures}
-            disabled={!isOnline}
+            disabled={!isOnline || !isAuthReady || isAuthLoading || isSessionLoading}
           />
         </div>
         <div className="mt-2">
@@ -98,6 +105,18 @@ export const AIFeaturesCard = ({ aiSettings, onSaveApiKey, onToggleAiFeatures })
               <span>AI features are only available when you're online</span>
             </div>
           )}
+          {isAuthLoading || isSessionLoading ? (
+            <div className="flex items-center gap-2 text-xs text-amber-500 mt-1.5">
+              <AlertTriangle className="h-3.5 w-3.5" />
+              <span>Checking authentication status...</span>
+            </div>
+          ) : null}
+          {!isAuthReady && !isAuthLoading && !isSessionLoading ? (
+            <div className="flex items-center gap-2 text-xs text-amber-500 mt-1.5">
+              <AlertTriangle className="h-3.5 w-3.5" />
+              <span>Sign in to enable AI features</span>
+            </div>
+          ) : null}
         </div>
       </CardHeader>
       <CardContent className="p-6 pt-0 space-y-6">
@@ -115,7 +134,7 @@ export const AIFeaturesCard = ({ aiSettings, onSaveApiKey, onToggleAiFeatures })
                       value={apiKey}
                       onChange={(e) => setApiKey(e.target.value)}
                       placeholder="Enter your Gemini API Key"
-                      disabled={isSaving}
+                      disabled={isSaving || !isAuthReady}
                       className="bg-overlay/5 border-overlay/20 focus:border-primary/50"
                     />
                     <p className="text-xs text-text-primary/50">
@@ -132,7 +151,7 @@ export const AIFeaturesCard = ({ aiSettings, onSaveApiKey, onToggleAiFeatures })
                         setApiKey(aiSettings?.apiKey || '');
                         setStatus(null);
                       }}
-                      disabled={isSaving}
+                      disabled={isSaving || !isAuthReady}
                       className="border-overlay/20 hover:bg-overlay/10"
                     >
                       Cancel
@@ -140,7 +159,7 @@ export const AIFeaturesCard = ({ aiSettings, onSaveApiKey, onToggleAiFeatures })
                     <Button 
                       size="sm"
                       onClick={handleSaveApiKey}
-                      disabled={isSaving || !isOnline}
+                      disabled={isSaving || !isOnline || !isAuthReady}
                       className="bg-primary hover:bg-primary/90"
                     >
                       {isSaving ? 'Saving...' : 'Save Key'}
@@ -168,7 +187,7 @@ export const AIFeaturesCard = ({ aiSettings, onSaveApiKey, onToggleAiFeatures })
                     variant={aiSettings?.apiKey ? "outline" : "default"}
                     size="sm"
                     onClick={() => setIsEditing(true)}
-                    disabled={!isOnline}
+                    disabled={!isOnline || !isAuthReady}
                     className={aiSettings?.apiKey ? "border-overlay/20 hover:bg-overlay/10" : "bg-primary hover:bg-primary/90"}
                   >
                     {aiSettings?.apiKey ? 'Change API Key' : 'Add API Key'}
