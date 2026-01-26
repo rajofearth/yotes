@@ -111,7 +111,13 @@ export const AIFeaturesCard = ({ aiSettings, onSaveApiKey, onToggleAiFeatures })
               <span>Checking authentication status...</span>
             </div>
           ) : null}
-          {!isAuthReady && !isAuthLoading && !isSessionLoading ? (
+          {!isAuthReady && !isAuthLoading && !isSessionLoading && hasSession ? (
+            <div className="flex items-center gap-2 text-xs text-amber-500 mt-1.5">
+              <AlertTriangle className="h-3.5 w-3.5" />
+              <span>Finalizing Convex authentication...</span>
+            </div>
+          ) : null}
+          {!isAuthReady && !isAuthLoading && !isSessionLoading && !hasSession ? (
             <div className="flex items-center gap-2 text-xs text-amber-500 mt-1.5">
               <AlertTriangle className="h-3.5 w-3.5" />
               <span>Sign in to enable AI features</span>
