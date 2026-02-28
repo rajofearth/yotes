@@ -9,7 +9,14 @@ const additionalAllowedOrigins =
     .map((origin) => origin.trim())
     .filter(Boolean) ?? [];
 
-const allowedOrigins = [siteUrl, ...additionalAllowedOrigins].filter(
+// CORS_ALLOWED_ORIGINS: comma-separated frontend origins (e.g. https://yotes.vercel.app,http://localhost:4000)
+// If unset, falls back to SITE_URL + ADDITIONAL_ALLOWED_ORIGINS
+const corsOrigins =
+  process.env.CORS_ALLOWED_ORIGINS?.split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean) ?? [siteUrl, ...additionalAllowedOrigins];
+
+const allowedOrigins = corsOrigins.filter(
   (origin): origin is string => Boolean(origin),
 );
 

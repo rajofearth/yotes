@@ -61,6 +61,19 @@ From Yashraj’s rough TODO list, here’s what’s in the pipeline:
 - Google OAuth credentials configured for Better Auth
 - Convex deployment with Better Auth env variables
 
+### Convex Environment Variables
+
+Set these via `npx convex env set` or the Convex dashboard. For production:
+
+| Variable | Purpose | Example (production) |
+|----------|---------|---------------------|
+| `BETTER_AUTH_URL` | OAuth redirect base (must be Convex site URL) | `prod convex link` |
+| `SITE_URL` | Frontend URL for crossDomain redirect | `prod link` |
+| `CORS_ALLOWED_ORIGINS` | Allowed origins for CORS (comma-separated) | ` prod website link ,http://localhost:4000` |
+| `BETTER_AUTH_SECRET` | Auth signing secret | (from `openssl rand -base64 32`) |
+| `GOOGLE_CLIENT_ID` | Google OAuth client ID | From Google Cloud Console |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth client secret | From Google Cloud Console |
+
 ## Installation
 
 1. **Clone the Repository**
